@@ -1,0 +1,358 @@
+<!-- Cost Tab: Financial calculation for PV system -->
+
+<div id="cost-placeholder" class="placeholder">
+  <p><strong>No data yet</strong></p>
+  <p>
+    Fetch solar data from the Location tab first, then configure cost parameters
+    here.
+  </p>
+</div>
+
+<div id="cost-content" style="display: none">
+  <!-- Basic Settings -->
+  <div class="section">
+    <h3>Basic Settings</h3>
+
+    <div class="form-row-inline">
+      <div>
+        <label for="cost-monthly-bill">Monthly Energy Bill ($)</label>
+        <input
+          type="number"
+          id="cost-monthly-bill"
+          min="0"
+          step="10"
+          value="300"
+        />
+      </div>
+      <div>
+        <label for="cost-energy-price">Energy Cost ($/kWh)</label>
+        <input
+          type="number"
+          id="cost-energy-price"
+          min="0"
+          step="0.01"
+          value="0.31"
+        />
+      </div>
+    </div>
+
+    <div class="form-row-inline">
+      <div>
+        <label for="cost-incentives">Solar Incentives ($)</label>
+        <input
+          type="number"
+          id="cost-incentives"
+          min="0"
+          step="100"
+          value="7000"
+        />
+      </div>
+      <div>
+        <label for="cost-install-per-watt">Install Cost ($/W)</label>
+        <input
+          type="number"
+          id="cost-install-per-watt"
+          min="0"
+          step="0.1"
+          value="4.0"
+        />
+      </div>
+    </div>
+
+    <!-- Read-only fields from API/config -->
+    <div class="stats-box" id="cost-auto-fields">
+      <div class="stats-row">
+        <span class="stats-label">Panels:</span>
+        <span class="stats-value" id="cost-panels-count">-</span>
+      </div>
+      <div class="stats-row">
+        <span class="stats-label">Panel Capacity:</span>
+        <span class="stats-value" id="cost-panel-capacity">-</span>
+      </div>
+      <div class="stats-row">
+        <span class="stats-label">Yearly Energy DC:</span>
+        <span class="stats-value" id="cost-yearly-energy">-</span>
+      </div>
+      <div class="stats-row">
+        <span class="stats-label">Installation Size:</span>
+        <span class="stats-value" id="cost-install-size">-</span>
+      </div>
+      <div class="stats-row">
+        <span class="stats-label">Lifespan:</span>
+        <span class="stats-value" id="cost-lifespan">-</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Advanced Settings -->
+  <div class="section">
+    <h3>Advanced Settings</h3>
+    <div class="form-row-inline">
+      <div>
+        <label for="cost-dc-ac-derate">DC-to-AC Derate</label>
+        <input
+          type="number"
+          id="cost-dc-ac-derate"
+          min="0"
+          max="1"
+          step="0.01"
+          value="0.85"
+        />
+      </div>
+      <div>
+        <label for="cost-eff-depreciation">Efficiency Dep. Factor</label>
+        <input
+          type="number"
+          id="cost-eff-depreciation"
+          min="0.9"
+          max="1"
+          step="0.001"
+          value="0.995"
+        />
+      </div>
+    </div>
+    <div class="form-row-inline">
+      <div>
+        <label for="cost-increase-factor">Cost Increase Factor</label>
+        <input
+          type="number"
+          id="cost-increase-factor"
+          min="1"
+          max="1.1"
+          step="0.001"
+          value="1.022"
+        />
+      </div>
+      <div>
+        <label for="cost-discount-rate">Discount Rate</label>
+        <input
+          type="number"
+          id="cost-discount-rate"
+          min="1"
+          max="1.2"
+          step="0.001"
+          value="1.04"
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- Calculate button -->
+  <button
+    class="btn btn-primary"
+    onclick="calculateCost()"
+    style="margin-bottom: 12px"
+  >
+    Calculate
+  </button>
+
+  <!-- Results -->
+  <div id="cost-results" style="display: none">
+    <div class="section">
+      <h3>Results</h3>
+      <div class="card-grid">
+        <div class="cost-result">
+          <div class="cost-label">Cost with Solar</div>
+          <div class="cost-value" id="cost-with-solar">-</div>
+        </div>
+        <div class="cost-result">
+          <div class="cost-label">Cost without Solar</div>
+          <div class="cost-value" id="cost-without-solar">-</div>
+        </div>
+      </div>
+      <div class="cost-result" style="text-align: center">
+        <div class="cost-label">Lifetime Savings</div>
+        <div class="cost-value" id="cost-savings" style="font-size: 22px">
+          -
+        </div>
+      </div>
+    </div>
+
+    <!-- Breakdown -->
+    <div class="section">
+      <h3>Breakdown</h3>
+      <div class="stats-box" id="cost-breakdown"></div>
+    </div>
+
+    <button class="btn-inject" onclick="injectCostAnalysis(this)">
+      <span class="inject-icon">&#8677;</span> Inject to Sheet
+    </button>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // Cost Tab Logic
+  // ============================================================
+  var costParams = {};
+
+  function initCostTab() {
+    if (!APP.buildingInsights) return;
+
+    document.getElementById("cost-placeholder").style.display = "none";
+    document.getElementById("cost-content").style.display = "block";
+
+    var sp = APP.buildingInsights.solarPotential || {};
+    var configs = sp.solarPanelConfigs || [];
+    var ratio = getCapacityRatio();
+    var capacity = getEffectiveCapacity();
+    var lifespan = sp.panelLifetimeYears || 20;
+
+    // Find energy for current panel count
+    var yearlyEnergy = 0;
+    for (var i = 0; i < configs.length; i++) {
+      if (configs[i].panelsCount >= APP.panelCount) {
+        yearlyEnergy = (configs[i].yearlyEnergyDcKwh || 0) * ratio;
+        break;
+      }
+    }
+    if (yearlyEnergy === 0 && configs.length > 0) {
+      yearlyEnergy =
+        (configs[configs.length - 1].yearlyEnergyDcKwh || 0) * ratio;
+    }
+
+    var installSizeKw = (APP.panelCount * capacity) / 1000;
+
+    document.getElementById("cost-panels-count").textContent = APP.panelCount;
+    document.getElementById("cost-panel-capacity").textContent =
+      capacity + " W";
+    document.getElementById("cost-yearly-energy").textContent =
+      yearlyEnergy.toFixed(0) + " kWh";
+    document.getElementById("cost-install-size").textContent =
+      installSizeKw.toFixed(2) + " kW";
+    document.getElementById("cost-lifespan").textContent = lifespan + " years";
+  }
+
+  function calculateCost() {
+    var sp = APP.buildingInsights.solarPotential || {};
+    var configs = sp.solarPanelConfigs || [];
+    var ratio = getCapacityRatio();
+    var capacity = getEffectiveCapacity();
+
+    var panelsCount = APP.panelCount;
+    var yearlyEnergyDcKwh = 0;
+    for (var i = 0; i < configs.length; i++) {
+      if (configs[i].panelsCount >= panelsCount) {
+        yearlyEnergyDcKwh = (configs[i].yearlyEnergyDcKwh || 0) * ratio;
+        break;
+      }
+    }
+    if (yearlyEnergyDcKwh === 0 && configs.length > 0) {
+      yearlyEnergyDcKwh =
+        (configs[configs.length - 1].yearlyEnergyDcKwh || 0) * ratio;
+    }
+
+    // Read inputs
+    var monthlyBill =
+      parseFloat(document.getElementById("cost-monthly-bill").value) || 0;
+    var energyCost =
+      parseFloat(document.getElementById("cost-energy-price").value) || 0.31;
+    var incentives =
+      parseFloat(document.getElementById("cost-incentives").value) || 0;
+    var installPerWatt =
+      parseFloat(document.getElementById("cost-install-per-watt").value) || 4.0;
+    var dcToAcDerate =
+      parseFloat(document.getElementById("cost-dc-ac-derate").value) || 0.85;
+    var effDepreciation =
+      parseFloat(document.getElementById("cost-eff-depreciation").value) ||
+      0.995;
+    var costIncrease =
+      parseFloat(document.getElementById("cost-increase-factor").value) ||
+      1.022;
+    var discountRate =
+      parseFloat(document.getElementById("cost-discount-rate").value) || 1.04;
+    var lifespan = sp.panelLifetimeYears || 20;
+
+    // Calculations (matching the reference example)
+    var installSizeKw = (panelsCount * capacity) / 1000;
+    var installCostTotal = installPerWatt * installSizeKw * 1000;
+
+    var monthlyKwh = energyCost > 0 ? monthlyBill / energyCost : 0;
+    var yearlyKwh = monthlyKwh * 12;
+
+    var initialAcKwh = yearlyEnergyDcKwh * dcToAcDerate;
+
+    // Yearly production with efficiency depreciation
+    var yearlyBillEstimates = [];
+    for (var y = 0; y < lifespan; y++) {
+      var produced = initialAcKwh * Math.pow(effDepreciation, y);
+      var billKwh = yearlyKwh - produced;
+      var billEst =
+        (billKwh * energyCost * Math.pow(costIncrease, y)) /
+        Math.pow(discountRate, y);
+      yearlyBillEstimates.push(Math.max(billEst, 0));
+    }
+
+    var remainingBill = yearlyBillEstimates.reduce(function (a, b) {
+      return a + b;
+    }, 0);
+    var totalWithSolar = installCostTotal + remainingBill - incentives;
+
+    // Cost without solar
+    var totalWithoutSolar = 0;
+    for (var y2 = 0; y2 < lifespan; y2++) {
+      totalWithoutSolar +=
+        (monthlyBill * 12 * Math.pow(costIncrease, y2)) /
+        Math.pow(discountRate, y2);
+    }
+
+    var savings = totalWithoutSolar - totalWithSolar;
+
+    // Display results
+    document.getElementById("cost-results").style.display = "block";
+    document.getElementById("cost-with-solar").textContent =
+      "$" + totalWithSolar.toFixed(0);
+    document.getElementById("cost-without-solar").textContent =
+      "$" + totalWithoutSolar.toFixed(0);
+    document.getElementById("cost-savings").textContent =
+      "$" + savings.toFixed(0);
+
+    // Breakdown
+    var breakdown =
+      '<div class="stats-row"><span class="stats-label">Installation Cost</span><span class="stats-value">$' +
+      installCostTotal.toFixed(0) +
+      "</span></div>" +
+      '<div class="stats-row"><span class="stats-label">Solar Incentives</span><span class="stats-value">-$' +
+      incentives.toFixed(0) +
+      "</span></div>" +
+      '<div class="stats-row"><span class="stats-label">Remaining Utility Bills</span><span class="stats-value">$' +
+      remainingBill.toFixed(0) +
+      "</span></div>" +
+      '<div class="stats-row"><span class="stats-label">Yearly Consumption</span><span class="stats-value">' +
+      yearlyKwh.toFixed(0) +
+      " kWh</span></div>" +
+      '<div class="stats-row"><span class="stats-label">Initial AC Production</span><span class="stats-value">' +
+      initialAcKwh.toFixed(0) +
+      " kWh/yr</span></div>";
+    document.getElementById("cost-breakdown").innerHTML = breakdown;
+
+    // Store params for injection
+    costParams = {
+      panelsCount: panelsCount,
+      panelCapacityWatts: capacity,
+      installationSizeKw: installSizeKw,
+      installationCostTotal: installCostTotal,
+      yearlyEnergyDcKwh: yearlyEnergyDcKwh,
+      monthlyAverageEnergyBill: monthlyBill,
+      energyCostPerKwh: energyCost,
+      solarIncentives: incentives,
+      installationCostPerWatt: installPerWatt,
+      dcToAcDerate: dcToAcDerate,
+      efficiencyDepreciationFactor: effDepreciation,
+      costIncreaseFactor: costIncrease,
+      discountRate: discountRate,
+      installationLifeSpan: lifespan,
+      totalCostWithSolar: Math.round(totalWithSolar * 100) / 100,
+      totalCostWithoutSolar: Math.round(totalWithoutSolar * 100) / 100,
+      savings: Math.round(savings * 100) / 100,
+    };
+  }
+
+  function injectCostAnalysis(btn) {
+    if (!costParams.panelsCount) {
+      showError("Please calculate costs first.");
+      return;
+    }
+    injectToSheet(btn, "writeCostAnalysis", [costParams]);
+  }
+</script>

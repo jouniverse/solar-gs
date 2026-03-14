@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        color: #333;
+        padding: 16px;
+        margin: 0;
+      }
+      h2 {
+        margin-top: 0;
+        font-size: 16px;
+        color: #1a73e8;
+      }
+      h3 {
+        font-size: 14px;
+        margin-top: 16px;
+        margin-bottom: 8px;
+      }
+      p,
+      li {
+        line-height: 1.5;
+      }
+      ul {
+        padding-left: 20px;
+      }
+      .section {
+        margin-bottom: 16px;
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 8px;
+      }
+      .note {
+        background: #fff3cd;
+        border-radius: 6px;
+        padding: 10px 12px;
+        margin-top: 12px;
+        font-size: 12px;
+      }
+      code {
+        background: #e8eaed;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Solar System Designer — Help</h2>
+
+    <div class="section">
+      <h3>Getting Started</h3>
+      <ol>
+        <li>
+          Go to <strong>Solar API &gt; Settings</strong> to enter your Google
+          Maps Platform API key.
+        </li>
+        <li>
+          Open the sidebar via <strong>Solar API &gt; Open Sidebar</strong>.
+        </li>
+        <li>
+          In the <strong>Location</strong> tab, enter an address or click on the
+          map to select a location.
+        </li>
+        <li>
+          Click <strong>Fetch Solar Data</strong> to retrieve building insights
+          and data layers.
+        </li>
+        <li>
+          Explore the tabs: Building, Layers, Charts, and Cost to analyze the
+          solar potential.
+        </li>
+        <li>
+          Use <strong>Inject to Sheet</strong> buttons to export data into
+          spreadsheet tabs.
+        </li>
+      </ol>
+    </div>
+
+    <div class="section">
+      <h3>Tabs Overview</h3>
+      <ul>
+        <li>
+          <strong>Location</strong> — Select location, toggle satellite/street
+          view, fetch solar data.
+        </li>
+        <li>
+          <strong>Building</strong> — View building summary, roof segments,
+          individual panel layout, and system configuration.
+        </li>
+        <li>
+          <strong>Layers</strong> — Visualize GeoTIFF data layers: annual flux,
+          monthly flux, hourly shade, and DSM/RGB imagery.
+        </li>
+        <li>
+          <strong>Charts</strong> — Interactive charts of energy metrics, panel
+          efficiency, and sunshine distribution.
+        </li>
+        <li>
+          <strong>Cost</strong> — Financial analysis: installation costs,
+          utility savings, and break-even estimates.
+        </li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h3>Key Data Points</h3>
+      <ul>
+        <li>
+          <strong>Annual Flux</strong> — Solar energy received per square meter
+          per year (kWh/m²/yr).
+        </li>
+        <li>
+          <strong>Yearly Energy DC</strong> — Total DC power the panels can
+          generate in a year (kWh).
+        </li>
+        <li>
+          <strong>Panel Capacity</strong> — Rated power output of each solar
+          panel (Watts).
+        </li>
+        <li>
+          <strong>DC-to-AC Derate</strong> — Conversion efficiency from DC to AC
+          power (typically ~0.85).
+        </li>
+        <li>
+          <strong>Efficiency Depreciation</strong> — Annual panel performance
+          degradation factor.
+        </li>
+        <li>
+          <strong>Sunshine Quantiles</strong> — Distribution of solar irradiance
+          across the roof surface.
+        </li>
+      </ul>
+    </div>
+
+    <div class="note">
+      <strong>API Costs:</strong> The Google Solar API has usage-based pricing.
+      Check
+      <a
+        href="https://developers.google.com/maps/documentation/solar/usage-and-billing"
+        target="_blank"
+        >Google's billing docs</a
+      >
+      for current rates. Building Insights requests and Data Layers requests are
+      billed separately.
+    </div>
+  </body>
+</html>

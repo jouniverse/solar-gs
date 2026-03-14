@@ -1,0 +1,118 @@
+<!-- Off-Grid PV Tab -->
+<div class="tab-title">Off-Grid PV</div>
+<div class="location-display">Location: 45, 8</div>
+
+<form id="form-off-grid" onsubmit="return false;">
+  <div class="form-group">
+    <label for="og-raddatabase">Solar radiation database</label>
+    <select name="raddatabase" id="og-raddatabase">
+      <option value="PVGIS-SARAH3">PVGIS-SARAH3 (Europe, Africa, Asia)</option>
+      <option value="PVGIS-NSRDB">PVGIS-NSRDB (Americas)</option>
+      <option value="PVGIS-ERA5">PVGIS-ERA5 (Global, inc. high-lat)</option>
+      <option value="PVGIS-COSMO">PVGIS-COSMO (Europe)</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label class="required" for="og-peakpower"
+      >Installed peak PV power (Wp)</label
+    >
+    <input
+      type="number"
+      name="peakpower"
+      id="og-peakpower"
+      value="50"
+      min="0"
+      step="1"
+    />
+  </div>
+
+  <div class="form-group">
+    <label class="required" for="og-batterysize">Battery capacity (Wh)</label>
+    <input
+      type="number"
+      name="batterysize"
+      id="og-batterysize"
+      value="600"
+      min="0"
+      step="1"
+    />
+  </div>
+
+  <div class="form-group">
+    <label class="required" for="og-cutoff">Discharge cutoff limit (%)</label>
+    <input
+      type="number"
+      name="cutoff"
+      id="og-cutoff"
+      value="40"
+      min="0"
+      max="100"
+      step="1"
+    />
+  </div>
+
+  <div class="form-group">
+    <label class="required" for="og-consumptionday"
+      >Consumption per day (Wh)</label
+    >
+    <input
+      type="number"
+      name="consumptionday"
+      id="og-consumptionday"
+      value="300"
+      min="0"
+      step="1"
+    />
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label for="og-angle">Slope (°)</label>
+      <input
+        type="number"
+        name="angle"
+        id="og-angle"
+        value="35"
+        min="0"
+        max="90"
+        step="1"
+      />
+    </div>
+    <div class="form-group">
+      <label for="og-aspect">Azimuth (°)</label>
+      <input
+        type="number"
+        name="aspect"
+        id="og-aspect"
+        value="0"
+        min="-180"
+        max="180"
+        step="1"
+      />
+    </div>
+  </div>
+
+  <button class="collapsible-toggle">Upload consumption data</button>
+  <div class="collapsible-content">
+    <div class="form-group">
+      <label for="og-hourconsumption"
+        >Hourly consumption profile (24 comma-separated fractions summing to
+        1)</label
+      >
+      <input
+        type="text"
+        name="hourconsumption"
+        id="og-hourconsumption"
+        placeholder="e.g. 0.04,0.04,0.04,..."
+      />
+    </div>
+  </div>
+
+  <button
+    class="btn-primary"
+    onclick="fetchData('fetchOffGrid', 'form-off-grid')"
+  >
+    Fetch Data
+  </button>
+</form>

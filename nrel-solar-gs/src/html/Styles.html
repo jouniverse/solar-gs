@@ -1,0 +1,322 @@
+<style>
+  /* Reset & Base */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Google Sans', Roboto, Arial, sans-serif;
+    font-size: 13px;
+    color: #202124;
+    background: #fff;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* API Key Banner */
+  .api-key-banner {
+    background: #fef7e0;
+    border-bottom: 1px solid #f5c518;
+    padding: 10px 14px;
+  }
+  .api-key-banner p {
+    font-size: 12px;
+    color: #5f4b00;
+    margin-bottom: 6px;
+  }
+
+  /* Sections */
+  .section {
+    padding: 12px 14px 8px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .section-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #5f6368;
+    margin-bottom: 8px;
+  }
+
+  /* Input Rows & Fields */
+  .input-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+  .field.full-width {
+    flex: 1 1 100%;
+  }
+  .field label {
+    font-size: 11px;
+    color: #5f6368;
+    margin-bottom: 3px;
+    font-weight: 500;
+  }
+  input[type="number"],
+  input[type="text"],
+  select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #202124;
+    background: #fff;
+    transition: border-color 0.15s;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: #1a73e8;
+    box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
+  }
+
+  /* Map */
+  #map {
+    height: 180px;
+    width: 100%;
+    margin-top: 8px;
+    border-radius: 6px;
+    border: 1px solid #dadce0;
+    z-index: 0;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    border-bottom: 2px solid #e0e0e0;
+    background: #f8f9fa;
+    padding: 0 6px;
+  }
+  .tab {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 10px 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #5f6368;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+  .tab:hover {
+    color: #1a73e8;
+  }
+  .tab.active {
+    color: #1a73e8;
+    border-bottom-color: #1a73e8;
+  }
+
+  /* Panels */
+  .panel {
+    display: none;
+    padding: 12px 14px;
+  }
+  .panel.active {
+    display: block;
+  }
+
+  /* Form Grid */
+  .form-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .form-grid .field {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 110px;
+  }
+
+  /* Advanced Section */
+  .advanced {
+    margin: 6px 0 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 0;
+  }
+  .advanced summary {
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #1a73e8;
+    cursor: pointer;
+    list-style: none;
+  }
+  .advanced summary::-webkit-details-marker { display: none; }
+  .advanced summary::before {
+    content: "\25B6";
+    font-size: 9px;
+    margin-right: 6px;
+    transition: transform 0.15s;
+    display: inline-block;
+  }
+  .advanced[open] summary::before {
+    transform: rotate(90deg);
+  }
+  .advanced .form-grid {
+    padding: 0 10px 10px;
+  }
+
+  /* Checkbox */
+  .checkbox-field {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 6px;
+    padding-top: 18px;
+  }
+  .checkbox-field label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: #202124;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-block;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
+  }
+  .btn-primary {
+    background: #1a73e8;
+    color: #fff;
+    width: 100%;
+    margin-top: 4px;
+  }
+  .btn-primary:hover {
+    background: #1765cc;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .btn-primary:disabled {
+    background: #a8c7fa;
+    cursor: default;
+    box-shadow: none;
+  }
+  .btn-sm {
+    padding: 5px 12px;
+    font-size: 12px;
+    background: #1a73e8;
+    color: #fff;
+    border-radius: 4px;
+  }
+
+  /* Helper Text */
+  .helper-text {
+    font-size: 12px;
+    color: #5f6368;
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+
+  /* Results Area */
+  .results-area {
+    padding: 12px 14px;
+  }
+
+  /* Spinner */
+  .spinner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #5f6368;
+    font-size: 12px;
+    padding: 8px 0;
+  }
+  .spinner-dot {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #dadce0;
+    border-top-color: #1a73e8;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Status */
+  .status {
+    font-size: 12px;
+    line-height: 1.5;
+    margin-bottom: 4px;
+  }
+  .status.error {
+    color: #d93025;
+    background: #fce8e6;
+    padding: 8px 10px;
+    border-radius: 4px;
+  }
+  .status.success {
+    color: #137333;
+    background: #e6f4ea;
+    padding: 8px 10px;
+    border-radius: 4px;
+  }
+  .status.warning {
+    color: #7c5a00;
+    background: #fef7e0;
+    padding: 8px 10px;
+    border-radius: 4px;
+  }
+
+  /* Result Cards */
+  .result-card {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-top: 8px;
+  }
+  .result-card h4 {
+    font-size: 12px;
+    font-weight: 600;
+    color: #202124;
+    margin-bottom: 6px;
+  }
+  .result-card table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .result-card td {
+    padding: 3px 4px;
+    border-bottom: 1px solid #eeeeee;
+  }
+  .result-card td:first-child {
+    color: #5f6368;
+    width: 50%;
+  }
+  .result-card td:last-child {
+    font-weight: 500;
+    text-align: right;
+  }
+  .result-card .highlight {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1a73e8;
+    text-align: center;
+    padding: 8px 0;
+  }
+  .result-card .highlight-label {
+    font-size: 11px;
+    color: #5f6368;
+    text-align: center;
+    margin-top: -4px;
+    margin-bottom: 6px;
+  }
+</style>

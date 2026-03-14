@@ -1,0 +1,122 @@
+<!-- Tracking PV Tab -->
+<div class="tab-title">Tracking PV</div>
+<div class="location-display">Location: 45, 8</div>
+
+<form id="form-tracking-pv" onsubmit="return false;">
+  <div class="form-group">
+    <label for="tp-raddatabase">Solar radiation database</label>
+    <select name="raddatabase" id="tp-raddatabase">
+      <option value="PVGIS-SARAH3">PVGIS-SARAH3 (Europe, Africa, Asia)</option>
+      <option value="PVGIS-NSRDB">PVGIS-NSRDB (Americas)</option>
+      <option value="PVGIS-ERA5">PVGIS-ERA5 (Global, inc. high-lat)</option>
+      <option value="PVGIS-COSMO">PVGIS-COSMO (Europe)</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="tp-pvtechchoice">PV technology</label>
+    <select name="pvtechchoice" id="tp-pvtechchoice">
+      <option value="crystSi">Crystalline Silicon (original)</option>
+      <option value="crystSi2025">Crystalline Silicon (2025)</option>
+      <option value="CIS">CIS</option>
+      <option value="CdTe">CdTe</option>
+      <option value="Unknown">Unknown</option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label class="required" for="tp-peakpower">Peak power (kWp)</label>
+      <input
+        type="number"
+        name="peakpower"
+        id="tp-peakpower"
+        value="1"
+        min="0"
+        step="0.1"
+      />
+    </div>
+    <div class="form-group">
+      <label class="required" for="tp-loss">System loss (%)</label>
+      <input
+        type="number"
+        name="loss"
+        id="tp-loss"
+        value="14"
+        min="0"
+        max="100"
+        step="0.1"
+      />
+    </div>
+  </div>
+
+  <!-- Disable fixed for tracking -->
+  <input type="hidden" name="fixed" value="0" />
+
+  <div class="section-title">Tracking mounting options</div>
+
+  <div class="checkbox-group">
+    <input type="checkbox" name="vertical_axis" id="tp-vertical" value="1" />
+    <label for="tp-vertical">Vertical axis</label>
+  </div>
+  <div class="form-row" style="padding-left: 20px">
+    <div class="form-group">
+      <label for="tp-verticalaxisangle">Slope (°)</label>
+      <input
+        type="number"
+        name="verticalaxisangle"
+        id="tp-verticalaxisangle"
+        value=""
+        min="0"
+        max="90"
+        step="1"
+        placeholder="0-90"
+      />
+    </div>
+    <div class="checkbox-group">
+      <input
+        type="checkbox"
+        name="vertical_optimum"
+        id="tp-vertopt"
+        value="1"
+      />
+      <label for="tp-vertopt">Optimize</label>
+    </div>
+  </div>
+
+  <div class="checkbox-group">
+    <input type="checkbox" name="inclined_axis" id="tp-inclined" value="1" />
+    <label for="tp-inclined">Inclined axis</label>
+  </div>
+  <div class="form-row" style="padding-left: 20px">
+    <div class="form-group">
+      <label for="tp-inclinedaxisangle">Slope (°)</label>
+      <input
+        type="number"
+        name="inclinedaxisangle"
+        id="tp-inclinedaxisangle"
+        value=""
+        min="0"
+        max="90"
+        step="1"
+        placeholder="0-90"
+      />
+    </div>
+    <div class="checkbox-group">
+      <input type="checkbox" name="inclined_optimum" id="tp-incopt" value="1" />
+      <label for="tp-incopt">Optimize</label>
+    </div>
+  </div>
+
+  <div class="checkbox-group">
+    <input type="checkbox" name="twoaxis" id="tp-twoaxis" value="1" />
+    <label for="tp-twoaxis">Two axis</label>
+  </div>
+
+  <button
+    class="btn-primary"
+    onclick="fetchData('fetchTrackingPV', 'form-tracking-pv')"
+  >
+    Fetch Data
+  </button>
+</form>

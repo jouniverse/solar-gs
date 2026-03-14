@@ -1,0 +1,95 @@
+<!-- Monthly Radiation Tab -->
+<div class="tab-title">Monthly Radiation</div>
+<div class="location-display">Location: 45, 8</div>
+
+<form id="form-monthly" onsubmit="return false;">
+  <div class="form-group">
+    <label for="mr-raddatabase">Solar radiation database</label>
+    <select name="raddatabase" id="mr-raddatabase">
+      <option value="PVGIS-SARAH3">PVGIS-SARAH3 (Europe, Africa, Asia)</option>
+      <option value="PVGIS-NSRDB">PVGIS-NSRDB (Americas)</option>
+      <option value="PVGIS-ERA5">PVGIS-ERA5 (Global, inc. high-lat)</option>
+      <option value="PVGIS-COSMO">PVGIS-COSMO (Europe)</option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label class="required" for="mr-startyear">Start year</label>
+      <select name="startyear" id="mr-startyear"></select>
+    </div>
+    <div class="form-group">
+      <label class="required" for="mr-endyear">End year</label>
+      <select name="endyear" id="mr-endyear"></select>
+    </div>
+  </div>
+
+  <div class="section-title">Irradiation</div>
+
+  <div class="checkbox-group">
+    <input type="checkbox" name="horirrad" id="mr-horirrad" value="1" />
+    <label for="mr-horirrad">Global horizontal irradiation</label>
+  </div>
+  <div class="checkbox-group">
+    <input type="checkbox" name="mr_dni" id="mr-dni" value="1" />
+    <label for="mr-dni">Direct Normal Irradiation</label>
+  </div>
+  <div class="checkbox-group">
+    <input type="checkbox" name="optrad" id="mr-optrad" value="1" />
+    <label for="mr-optrad">Global irradiation optimum angle</label>
+  </div>
+  <div class="checkbox-group">
+    <input type="checkbox" name="selectrad" id="mr-selectrad" value="1" />
+    <label for="mr-selectrad">Global irradiation at angle:</label>
+  </div>
+  <div class="form-group" style="padding-left: 24px">
+    <input
+      type="number"
+      name="angle"
+      id="mr-angle"
+      value=""
+      min="0"
+      max="90"
+      step="1"
+      placeholder="0-90"
+    />
+  </div>
+
+  <div class="section-title">Ratio</div>
+  <div class="checkbox-group">
+    <input type="checkbox" name="d2g" id="mr-d2g" value="1" />
+    <label for="mr-d2g">Diffuse/global ratio</label>
+  </div>
+
+  <div class="section-title">Temperature</div>
+  <div class="checkbox-group">
+    <input type="checkbox" name="avtemp" id="mr-avtemp" value="1" />
+    <label for="mr-avtemp">Average temperature</label>
+  </div>
+
+  <button
+    class="btn-primary"
+    onclick="fetchData('fetchMonthlyRadiation', 'form-monthly')"
+  >
+    Fetch Data
+  </button>
+</form>
+
+<script>
+  (function () {
+    var startSel = document.getElementById("mr-startyear");
+    var endSel = document.getElementById("mr-endyear");
+    for (var y = 2005; y <= 2023; y++) {
+      var opt1 = document.createElement("option");
+      opt1.value = y;
+      opt1.textContent = y;
+      startSel.appendChild(opt1);
+      var opt2 = document.createElement("option");
+      opt2.value = y;
+      opt2.textContent = y;
+      endSel.appendChild(opt2);
+    }
+    startSel.value = "2005";
+    endSel.value = "2023";
+  })();
+</script>

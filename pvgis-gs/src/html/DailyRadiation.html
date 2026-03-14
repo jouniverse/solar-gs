@@ -1,0 +1,111 @@
+<!-- Daily Radiation Tab -->
+<div class="tab-title">Daily Radiation</div>
+<div class="location-display">Location: 45, 8</div>
+
+<form id="form-daily" onsubmit="return false;">
+  <div class="form-group">
+    <label for="dr-raddatabase">Solar radiation database</label>
+    <select name="raddatabase" id="dr-raddatabase">
+      <option value="PVGIS-SARAH3">PVGIS-SARAH3 (Europe, Africa, Asia)</option>
+      <option value="PVGIS-NSRDB">PVGIS-NSRDB (Americas)</option>
+      <option value="PVGIS-ERA5">PVGIS-ERA5 (Global, inc. high-lat)</option>
+      <option value="PVGIS-COSMO">PVGIS-COSMO (Europe)</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label class="required" for="dr-month">Month</label>
+    <select name="month" id="dr-month">
+      <option value="0">All months</option>
+      <option value="1">January</option>
+      <option value="2">February</option>
+      <option value="3">March</option>
+      <option value="4">April</option>
+      <option value="5">May</option>
+      <option value="6">June</option>
+      <option value="7">July</option>
+      <option value="8">August</option>
+      <option value="9">September</option>
+      <option value="10">October</option>
+      <option value="11">November</option>
+      <option value="12">December</option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <div class="checkbox-group">
+        <input type="radio" name="localtime" id="dr-utc" value="0" checked />
+        <label for="dr-utc">UTC time</label>
+      </div>
+    </div>
+    <div class="form-group">
+      <div class="checkbox-group">
+        <input type="radio" name="localtime" id="dr-local" value="1" />
+        <label for="dr-local">Local time</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">On fixed plane</div>
+
+  <div class="checkbox-group">
+    <input type="checkbox" name="global" id="dr-global" value="1" />
+    <label for="dr-global">Irradiance</label>
+  </div>
+  <div class="checkbox-group">
+    <input type="checkbox" name="clearsky" id="dr-clearsky" value="1" />
+    <label for="dr-clearsky">Clear-sky irradiance</label>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label for="dr-angle">Slope (°)</label>
+      <input
+        type="number"
+        name="angle"
+        id="dr-angle"
+        value="35"
+        min="0"
+        max="90"
+        step="1"
+      />
+    </div>
+    <div class="form-group">
+      <label for="dr-aspect">Azimuth (°)</label>
+      <input
+        type="number"
+        name="aspect"
+        id="dr-aspect"
+        value="0"
+        min="-180"
+        max="180"
+        step="1"
+      />
+    </div>
+  </div>
+
+  <div class="section-title">On sun-tracking plane</div>
+
+  <div class="checkbox-group">
+    <input type="checkbox" name="glob_2axis" id="dr-glob2axis" value="1" />
+    <label for="dr-glob2axis">Irradiance</label>
+  </div>
+  <div class="checkbox-group">
+    <input type="checkbox" name="clearsky_2axis" id="dr-cs2axis" value="1" />
+    <label for="dr-cs2axis">Clear-sky irradiance</label>
+  </div>
+
+  <div class="section-title">Temperature</div>
+  <div class="checkbox-group">
+    <input type="checkbox" name="showtemperatures" id="dr-temp" value="1" />
+    <label for="dr-temp">Daily temperature profile</label>
+  </div>
+
+  <button
+    class="btn-primary"
+    onclick="fetchData('fetchDailyRadiation', 'form-daily')"
+  >
+    Fetch Data
+  </button>
+</form>

@@ -1,0 +1,240 @@
+<script>
+  /**
+   * Google Solar GS — Main client-side logic
+   * Global state, tab switching, error/loading helpers, inject utilities
+   */
+
+  // ============================================================
+  // Global Application State
+  // ============================================================
+  var APP = {
+    lat: null,
+    lng: null,
+    quality: "HIGH",
+    radiusMeters: 50,
+
+    buildingInsights: null,
+    dataLayers: null,
+
+    panelCapacityWatts: null,
+    defaultCapacityWatts: 250,
+    panelCount: 0,
+    maxPanelCount: 0,
+    degradationRate: 0.005,
+
+    loading: false,
+    activeTab: "location",
+  };
+
+  // ============================================================
+  // Tab Switching
+  // ============================================================
+  document.addEventListener("DOMContentLoaded", function () {
+    var tabBtns = document.querySelectorAll(".tab-btn");
+    tabBtns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        switchTab(btn.getAttribute("data-tab"));
+      });
+    });
+  });
+
+  function switchTab(tabId) {
+    document.querySelectorAll(".tab-btn").forEach(function (btn) {
+      btn.classList.toggle("active", btn.getAttribute("data-tab") === tabId);
+    });
+    document.querySelectorAll(".tab-panel").forEach(function (panel) {
+      panel.classList.toggle("hidden", panel.id !== "tab-" + tabId);
+      panel.classList.toggle("active", panel.id === "tab-" + tabId);
+    });
+    APP.activeTab = tabId;
+
+    // Fix Leaflet map rendering when returning to a tab
+    if (
+      tabId === "location" &&
+      typeof locationMap !== "undefined" &&
+      locationMap
+    ) {
+      setTimeout(function () {
+        locationMap.invalidateSize();
+      }, 100);
+    }
+    if (tabId === "building" && APP.buildingInsights) {
+      if (typeof initPanelsMap === "function") initPanelsMap();
+    }
+    if (tabId === "layers" && APP.dataLayers) {
+      if (typeof initLayersMap === "function") initLayersMap();
+    }
+    if (tabId === "charts" && APP.buildingInsights) {
+      if (typeof renderAllCharts === "function") renderAllCharts();
+    }
+    if (tabId === "cost" && APP.buildingInsights) {
+      if (typeof initCostTab === "function") initCostTab();
+    }
+  }
+
+  // ============================================================
+  // Error & Loading Helpers
+  // ============================================================
+  function showError(msg) {
+    var banner = document.getElementById("error-banner");
+    var msgEl = document.getElementById("error-message");
+    msgEl.textContent = msg;
+    banner.classList.remove("hidden");
+  }
+
+  function hideError() {
+    document.getElementById("error-banner").classList.add("hidden");
+  }
+
+  function setLoading(isLoading) {
+    APP.loading = isLoading;
+    var fetchBtn = document.getElementById("btn-fetch");
+    if (fetchBtn) {
+      fetchBtn.disabled = isLoading;
+      fetchBtn.innerHTML = isLoading
+        ? '<span class="spinner"></span> Fetching...'
+        : "Fetch Solar Data";
+    }
+  }
+
+  // ============================================================
+  // Inject-to-Sheet Helpers
+  // ============================================================
+  function injectToSheet(btnEl, serverFn, args) {
+    btnEl.disabled = true;
+    var origText = btnEl.innerHTML;
+    btnEl.innerHTML = '<span class="spinner"></span> Writing...';
+
+    var runner = google.script.run
+      .withSuccessHandler(function (result) {
+        btnEl.disabled = false;
+        btnEl.innerHTML = origText;
+        showInjectResult(btnEl, result);
+      })
+      .withFailureHandler(function (err) {
+        btnEl.disabled = false;
+        btnEl.innerHTML = origText;
+        showInjectError(btnEl, err);
+      });
+
+    runner[serverFn].apply(runner, args);
+  }
+
+  function showInjectResult(btnEl, result) {
+    removeInjectMsg(btnEl);
+    var msg = document.createElement("div");
+    msg.className = result.success ? "success-banner" : "error-banner";
+    msg.style.cssText =
+      "display:block;margin-top:4px;padding:4px 8px;font-size:11px;border-radius:4px;";
+    msg.textContent = result.success
+      ? "\u2713 " + result.message
+      : "\u2717 " + (result.error || "Failed");
+    btnEl.parentNode.insertBefore(msg, btnEl.nextSibling);
+    setTimeout(function () {
+      if (msg.parentNode) msg.parentNode.removeChild(msg);
+    }, 4000);
+  }
+
+  function showInjectError(btnEl, err) {
+    removeInjectMsg(btnEl);
+    var msg = document.createElement("div");
+    msg.className = "error-banner";
+    msg.style.cssText =
+      "display:block;margin-top:4px;padding:4px 8px;font-size:11px;border-radius:4px;";
+    msg.textContent = "\u2717 " + (err.message || err);
+    btnEl.parentNode.insertBefore(msg, btnEl.nextSibling);
+    setTimeout(function () {
+      if (msg.parentNode) msg.parentNode.removeChild(msg);
+    }, 4000);
+  }
+
+  function removeInjectMsg(btnEl) {
+    var next = btnEl.nextSibling;
+    if (
+      next &&
+      (next.className === "success-banner" || next.className === "error-banner")
+    ) {
+      next.parentNode.removeChild(next);
+    }
+  }
+
+  // ============================================================
+  // Fetch Solar Data (main action)
+  // ============================================================
+  function fetchSolarData() {
+    if (APP.lat === null || APP.lng === null) {
+      showError("Please select a location first.");
+      return;
+    }
+    hideError();
+    setLoading(true);
+
+    google.script.run
+      .withSuccessHandler(onSolarDataReceived)
+      .withFailureHandler(onSolarDataError)
+      .fetchSolarData(APP.lat, APP.lng, APP.radiusMeters, APP.quality);
+  }
+
+  function onSolarDataReceived(result) {
+    setLoading(false);
+
+    if (result.buildingInsights && result.buildingInsights.success) {
+      APP.buildingInsights = result.buildingInsights.data;
+      var sp = APP.buildingInsights.solarPotential || {};
+      APP.defaultCapacityWatts = sp.panelCapacityWatts || 250;
+      APP.maxPanelCount = sp.maxArrayPanelsCount || 0;
+      APP.panelCount = APP.maxPanelCount;
+      if (typeof renderBuildingInsights === "function")
+        renderBuildingInsights();
+    } else if (result.buildingInsights) {
+      showError(
+        "Building Insights: " +
+          (result.buildingInsights.error || "Unknown error"),
+      );
+    }
+
+    if (result.dataLayers && result.dataLayers.success) {
+      APP.dataLayers = result.dataLayers.data;
+      if (typeof onDataLayersReceived === "function") onDataLayersReceived();
+    } else if (result.dataLayers) {
+      console.warn(
+        "Data Layers: " + (result.dataLayers.error || "Unknown error"),
+      );
+    }
+
+    if (APP.buildingInsights) {
+      switchTab("building");
+    }
+  }
+
+  function onSolarDataError(error) {
+    setLoading(false);
+    showError("Request failed: " + (error.message || error));
+  }
+
+  // ============================================================
+  // Utility: get effective panel capacity
+  // ============================================================
+  function getEffectiveCapacity() {
+    return APP.panelCapacityWatts || APP.defaultCapacityWatts;
+  }
+
+  function getCapacityRatio() {
+    if (!APP.panelCapacityWatts) return 1;
+    return APP.panelCapacityWatts / APP.defaultCapacityWatts;
+  }
+
+  // ============================================================
+  // Scientific tick formatter for Chart.js
+  // ============================================================
+  function sciTickCallback(value) {
+    if (value === 0) return "0";
+    var abs = Math.abs(value);
+    if (abs >= 1e6) return (value / 1e6).toFixed(1) + "M";
+    if (abs >= 1e5) return (value / 1e3).toFixed(0) + "k";
+    if (abs >= 1e4) return (value / 1e3).toFixed(1) + "k";
+    if (abs >= 1e3) return (value / 1e3).toFixed(1) + "k";
+    if (abs < 0.01 && abs > 0) return value.toExponential(1);
+    return Number.isInteger(value) ? value : value.toFixed(1);
+  }
+</script>

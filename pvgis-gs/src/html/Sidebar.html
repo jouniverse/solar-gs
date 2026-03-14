@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+  <head>
+    <base target="_top" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <?!= include('Styles') ?>
+  </head>
+  <body>
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="location">Location</button>
+      <button class="tab-btn" data-tab="grid-connected">Grid</button>
+      <button class="tab-btn" data-tab="tracking-pv">Track</button>
+      <button class="tab-btn" data-tab="off-grid">Off-Grid</button>
+      <button class="tab-btn" data-tab="monthly">Monthly</button>
+      <button class="tab-btn" data-tab="daily">Daily</button>
+      <button class="tab-btn" data-tab="hourly">Hourly</button>
+      <button class="tab-btn" data-tab="tmy">TMY</button>
+      <button class="tab-btn" data-tab="horizon">Horizon</button>
+    </div>
+
+    <!-- Tab Content Panels -->
+    <div class="tab-content active" id="tab-location">
+      <?!= include('LocationTab') ?>
+    </div>
+    <div class="tab-content" id="tab-grid-connected">
+      <?!= include('GridConnected') ?>
+    </div>
+    <div class="tab-content" id="tab-tracking-pv">
+      <?!= include('TrackingPV') ?>
+    </div>
+    <div class="tab-content" id="tab-off-grid"><?!= include('OffGrid') ?></div>
+    <div class="tab-content" id="tab-monthly">
+      <?!= include('MonthlyRadiation') ?>
+    </div>
+    <div class="tab-content" id="tab-daily">
+      <?!= include('DailyRadiation') ?>
+    </div>
+    <div class="tab-content" id="tab-hourly">
+      <?!= include('HourlyRadiation') ?>
+    </div>
+    <div class="tab-content" id="tab-tmy"><?!= include('TMY') ?></div>
+    <div class="tab-content" id="tab-horizon">
+      <?!= include('HorizonProfile') ?>
+    </div>
+
+    <!-- Status bar -->
+    <div id="status-bar" class="status-bar hidden"></div>
+
+    <?!= include('Scripts') ?>
+  </body>
+</html>

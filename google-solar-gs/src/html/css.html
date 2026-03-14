@@ -1,0 +1,507 @@
+<style>
+  /* === CSS Custom Properties === */
+  :root {
+    --primary: #1a73e8;
+    --primary-light: #e8f0fe;
+    --bg: #ffffff;
+    --bg-section: #f8f9fa;
+    --border: #dadce0;
+    --text: #202124;
+    --text-secondary: #5f6368;
+    --success: #0d652d;
+    --success-bg: #e6f4ea;
+    --error: #c5221f;
+    --error-bg: #fce8e6;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  }
+
+  /* === Reset & Base === */
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    font-family: "Google Sans", Roboto, Arial, sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg);
+    overflow-x: hidden;
+  }
+
+  /* === Tab Bar === */
+  .tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    overflow-x: auto;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 8px 4px;
+    border: none;
+    background: none;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    min-width: 0;
+    transition:
+      color 0.2s,
+      border-color 0.2s;
+  }
+  .tab-btn:hover {
+    color: var(--primary);
+  }
+  .tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+  }
+
+  /* === Tab Panels === */
+  .tab-panel {
+    padding: 12px;
+  }
+  .tab-panel.hidden {
+    display: none;
+  }
+
+  /* === Error Banner === */
+  .error-banner {
+    background: var(--error-bg);
+    color: var(--error);
+    padding: 8px 12px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .error-banner.hidden {
+    display: none;
+  }
+  .error-close {
+    background: none;
+    border: none;
+    color: var(--error);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 4px;
+  }
+
+  /* === Success Banner === */
+  .success-banner {
+    background: var(--success-bg);
+    color: var(--success);
+    padding: 6px 10px;
+    font-size: 11px;
+    border-radius: var(--radius);
+    margin-top: 6px;
+  }
+
+  /* === Sections & Cards === */
+  .section {
+    margin-bottom: 12px;
+  }
+  .card {
+    background: var(--bg-section);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    margin-bottom: 8px;
+  }
+  .card h4 {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .card-value {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .card-unit {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-left: 4px;
+  }
+
+  /* === Grid for summary cards === */
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  /* === Forms === */
+  h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+  label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+  input[type="text"],
+  input[type="number"],
+  select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus,
+  select:focus {
+    border-color: var(--primary);
+  }
+  .form-row {
+    margin-bottom: 8px;
+  }
+  .form-row-inline {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .form-row-inline > div {
+    flex: 1;
+  }
+
+  /* === Buttons === */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      background 0.2s,
+      opacity 0.2s;
+    width: 100%;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #1557b0;
+  }
+  .btn-secondary {
+    background: var(--bg-section);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: #e8eaed;
+  }
+  .btn-sm {
+    padding: 4px 10px;
+    font-size: 11px;
+    width: auto;
+  }
+
+  /* === Inject to Sheet Button === */
+  .btn-inject {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text-secondary);
+    font-size: 11px;
+    cursor: pointer;
+    margin-top: 6px;
+    transition: all 0.2s;
+  }
+  .btn-inject:hover:not(:disabled) {
+    background: var(--primary-light);
+    color: var(--primary);
+    border-color: var(--primary);
+  }
+  .btn-inject:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-inject .inject-icon {
+    font-size: 13px;
+  }
+
+  /* === Slider === */
+  input[type="range"] {
+    width: 100%;
+    margin: 4px 0;
+    accent-color: var(--primary);
+  }
+  .slider-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+    text-align: right;
+  }
+
+  /* === Tables === */
+  .table-container {
+    max-height: 300px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 4px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  th {
+    background: var(--primary-light);
+    padding: 6px 8px;
+    text-align: left;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 4px 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  tr:hover td {
+    background: #f8f9fa;
+  }
+
+  /* === Loading Spinner === */
+  .spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .loading-text {
+    color: var(--text-secondary);
+    font-size: 12px;
+  }
+  .loading-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  /* === Leaflet overrides for sidebar === */
+  .leaflet-container {
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+
+  /* === Help definitions === */
+  .help-dl dt {
+    font-weight: 600;
+    margin-top: 8px;
+  }
+  .help-dl dd {
+    color: var(--text-secondary);
+    margin-left: 0;
+    margin-bottom: 4px;
+  }
+
+  /* === Layer controls === */
+  .layer-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .layer-btn {
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--bg);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .layer-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+  .layer-btn:hover:not(.active) {
+    background: var(--bg-section);
+  }
+
+  /* === Legend === */
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+  .legend-gradient {
+    height: 10px;
+    flex: 1;
+    border-radius: 2px;
+  }
+
+  /* === Placeholder messages === */
+  .placeholder {
+    text-align: center;
+    padding: 30px 12px;
+    color: var(--text-secondary);
+  }
+  .placeholder p {
+    margin-top: 8px;
+  }
+
+  /* === Chart section === */
+  .chart-section {
+    margin-bottom: 16px;
+  }
+  .chart-desc {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+  .chart-container {
+    position: relative;
+    background: var(--bg-section);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px;
+  }
+  .chart-container canvas {
+    width: 100% !important;
+    height: 200px !important;
+  }
+
+  /* === Stats box === */
+  .stats-box {
+    background: var(--bg-section);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px;
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+  .stats-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+  }
+  .stats-label {
+    color: var(--text-secondary);
+  }
+  .stats-value {
+    font-weight: 600;
+  }
+
+  /* === Panel map container === */
+  .panel-map-container {
+    margin-bottom: 4px;
+  }
+  .panels-legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+  .panels-legend-gradient {
+    height: 10px;
+    flex: 1;
+    border-radius: 2px;
+    background: linear-gradient(
+      to right,
+      rgb(0, 50, 255),
+      rgb(128, 50, 128),
+      rgb(255, 50, 0)
+    );
+  }
+
+  /* === Layers info gap === */
+  .layers-info {
+    margin-top: 16px;
+  }
+
+  /* === Cost tab === */
+  .cost-result {
+    background: var(--primary-light);
+    border: 1px solid var(--primary);
+    border-radius: var(--radius);
+    padding: 10px;
+    margin-bottom: 8px;
+  }
+  .cost-result .cost-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+  }
+  .cost-result .cost-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--primary);
+  }
+
+  /* === Map layer control === */
+  .map-type-toggle {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .map-type-btn {
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .map-type-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+</style>

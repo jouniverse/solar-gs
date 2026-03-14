@@ -1,0 +1,174 @@
+<!-- Grid-Connected PV Tab -->
+<div class="tab-title">Grid-Connected PV</div>
+<div class="location-display">Location: 45, 8</div>
+
+<form id="form-grid-connected" onsubmit="return false;">
+  <div class="form-group">
+    <label for="gc-raddatabase">Solar radiation database</label>
+    <select name="raddatabase" id="gc-raddatabase">
+      <option value="PVGIS-SARAH3">PVGIS-SARAH3 (Europe, Africa, Asia)</option>
+      <option value="PVGIS-NSRDB">PVGIS-NSRDB (Americas)</option>
+      <option value="PVGIS-ERA5">PVGIS-ERA5 (Global, inc. high-lat)</option>
+      <option value="PVGIS-COSMO">PVGIS-COSMO (Europe)</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="gc-pvtechchoice">PV technology</label>
+    <select name="pvtechchoice" id="gc-pvtechchoice">
+      <option value="crystSi">Crystalline Silicon (original)</option>
+      <option value="crystSi2025">Crystalline Silicon (2025)</option>
+      <option value="CIS">CIS</option>
+      <option value="CdTe">CdTe</option>
+      <option value="Unknown">Unknown</option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label class="required" for="gc-peakpower">Peak power (kWp)</label>
+      <input
+        type="number"
+        name="peakpower"
+        id="gc-peakpower"
+        value="1"
+        min="0"
+        step="0.1"
+      />
+    </div>
+    <div class="form-group">
+      <label class="required" for="gc-loss">System loss (%)</label>
+      <input
+        type="number"
+        name="loss"
+        id="gc-loss"
+        value="14"
+        min="0"
+        max="100"
+        step="0.1"
+      />
+    </div>
+  </div>
+
+  <div class="section-title">Fixed mounting options</div>
+
+  <div class="form-group">
+    <label for="gc-mountingplace">Mounting position</label>
+    <select name="mountingplace" id="gc-mountingplace">
+      <option value="free">Free-standing</option>
+      <option value="building">Building-integrated</option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label for="gc-angle">Slope (°)</label>
+      <input
+        type="number"
+        name="angle"
+        id="gc-angle"
+        value="35"
+        min="0"
+        max="90"
+        step="1"
+      />
+    </div>
+    <div class="form-group">
+      <label for="gc-aspect">Azimuth (°)</label>
+      <input
+        type="number"
+        name="aspect"
+        id="gc-aspect"
+        value="0"
+        min="-180"
+        max="180"
+        step="1"
+      />
+    </div>
+  </div>
+
+  <div class="checkbox-group">
+    <input type="checkbox" name="optimalinclination" id="gc-optinc" value="1" />
+    <label for="gc-optinc">Optimize slope</label>
+  </div>
+  <div class="checkbox-group">
+    <input type="checkbox" name="optimalangles" id="gc-optang" value="1" />
+    <label for="gc-optang">Optimize slope and azimuth</label>
+  </div>
+
+  <div class="checkbox-group" style="margin-top: 10px">
+    <input
+      type="checkbox"
+      id="gc-price-toggle"
+      onchange="togglePriceSection('gc')"
+    />
+    <label for="gc-price-toggle"><strong>PV electricity price</strong></label>
+  </div>
+  <div
+    id="gc-price-section"
+    style="display: none; padding-left: 12px; border-left: 2px solid #e8eaed"
+  >
+    <div class="form-group">
+      <label for="gc-systemcost">PV system cost (your currency)</label>
+      <input
+        type="number"
+        name="systemcost"
+        id="gc-systemcost"
+        min="0"
+        step="1"
+      />
+    </div>
+    <div class="form-group">
+      <label for="gc-interest">Interest (%/year)</label>
+      <input
+        type="number"
+        name="interest"
+        id="gc-interest"
+        min="0"
+        step="0.1"
+      />
+    </div>
+    <div class="form-group">
+      <label for="gc-lifetime">Lifetime (years)</label>
+      <input
+        type="number"
+        name="lifetime"
+        id="gc-lifetime"
+        value="25"
+        min="1"
+        step="1"
+      />
+    </div>
+    <input type="hidden" name="pvprice" id="gc-pvprice" value="" />
+  </div>
+
+  <button
+    class="btn-primary"
+    onclick="
+      handlePriceToggle('gc');
+      fetchData('fetchGridConnected', 'form-grid-connected');
+    "
+  >
+    Fetch Data
+  </button>
+</form>
+
+<script>
+  function togglePriceSection(prefix) {
+    var toggle = document.getElementById(prefix + "-price-toggle");
+    var section = document.getElementById(prefix + "-price-section");
+    if (toggle && section) {
+      section.style.display = toggle.checked ? "block" : "none";
+    }
+  }
+
+  function handlePriceToggle(prefix) {
+    var toggle = document.getElementById(prefix + "-price-toggle");
+    var priceFlag = document.getElementById(prefix + "-pvprice");
+    if (toggle && toggle.checked && priceFlag) {
+      priceFlag.value = "1";
+    } else if (priceFlag) {
+      priceFlag.value = "";
+    }
+  }
+</script>

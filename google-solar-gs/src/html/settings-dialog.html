@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        color: #333;
+        padding: 16px;
+        margin: 0;
+      }
+      h2 {
+        margin-top: 0;
+        font-size: 16px;
+        color: #1a73e8;
+      }
+      p {
+        line-height: 1.5;
+      }
+      label {
+        display: block;
+        font-weight: bold;
+        margin-top: 14px;
+        margin-bottom: 4px;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #dadce0;
+        border-radius: 6px;
+        font-size: 13px;
+        box-sizing: border-box;
+      }
+      .btn {
+        padding: 8px 18px;
+        border: none;
+        border-radius: 6px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .btn-primary {
+        background: #1a73e8;
+        color: white;
+      }
+      .btn-primary:hover {
+        background: #1557b0;
+      }
+      .current-key {
+        margin-top: 10px;
+        font-size: 12px;
+        color: #5f6368;
+      }
+      .status-msg {
+        margin-top: 10px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        display: none;
+      }
+      .status-ok {
+        background: #e6f4ea;
+        color: #137333;
+        display: block;
+      }
+      .status-err {
+        background: #fce8e6;
+        color: #c5221f;
+        display: block;
+      }
+      .description {
+        color: #5f6368;
+        font-size: 12px;
+        margin-bottom: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Settings</h2>
+    <p class="description">
+      Solar System Designer uses the Google Maps Platform Solar API. Enter your
+      API key below to enable data fetching.
+    </p>
+
+    <label for="api-key-input">Google Maps API Key</label>
+    <input type="text" id="api-key-input" placeholder="Enter your API key" />
+
+    <div class="current-key" id="current-key-display">Loading...</div>
+
+    <div style="margin-top: 14px">
+      <button class="btn btn-primary" onclick="saveKey()">Save</button>
+    </div>
+
+    <div class="status-msg" id="status-msg"></div>
+
+    <script>
+      // Load current masked key on open
+      google.script.run
+        .withSuccessHandler(function (result) {
+          var el = document.getElementById("current-key-display");
+          if (result && result.hasKey) {
+            el.textContent = "Current key: " + result.masked;
+          } else {
+            el.textContent = "No API key stored.";
+          }
+        })
+        .withFailureHandler(function () {
+          document.getElementById("current-key-display").textContent =
+            "Could not load key.";
+        })
+        .getStoredApiKey();
+
+      function saveKey() {
+        var key = document.getElementById("api-key-input").value.trim();
+        if (!key) {
+          showStatus("Please enter an API key.", true);
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (result && result.success) {
+              showStatus("API key saved successfully.", false);
+              var masked =
+                key.substring(0, 8) + "..." + key.substring(key.length - 4);
+              document.getElementById("current-key-display").textContent =
+                "Current key: " + masked;
+              document.getElementById("api-key-input").value = "";
+            } else {
+              showStatus((result && result.error) || "Failed to save.", true);
+            }
+          })
+          .withFailureHandler(function (err) {
+            showStatus("Error: " + err.message, true);
+          })
+          .saveApiKey(key);
+      }
+
+      function showStatus(msg, isError) {
+        var el = document.getElementById("status-msg");
+        el.textContent = msg;
+        el.className = "status-msg " + (isError ? "status-err" : "status-ok");
+      }
+    </script>
+  </body>
+</html>

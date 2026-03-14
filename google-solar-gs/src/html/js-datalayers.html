@@ -1,0 +1,565 @@
+<!-- Data Layers Tab: Leaflet map with GeoTIFF overlays -->
+
+<div id="layers-placeholder" class="placeholder">
+  <p><strong>No data layers yet</strong></p>
+  <p>Fetch solar data from the Location tab first.</p>
+</div>
+
+<div id="layers-content" style="display: none">
+  <!-- Layer toggle buttons -->
+  <div class="section">
+    <h3>Data Layers</h3>
+    <div class="layer-controls">
+      <button class="layer-btn" data-layer="rgb" onclick="toggleLayer('rgb')">
+        RGB
+      </button>
+      <button
+        class="layer-btn"
+        data-layer="annualFlux"
+        onclick="toggleLayer('annualFlux')"
+      >
+        Annual Flux
+      </button>
+      <button
+        class="layer-btn"
+        data-layer="monthlyFlux"
+        onclick="toggleLayer('monthlyFlux')"
+      >
+        Monthly Flux
+      </button>
+      <button class="layer-btn" data-layer="mask" onclick="toggleLayer('mask')">
+        Mask
+      </button>
+    </div>
+
+    <!-- Monthly flux month selector (hidden by default) -->
+    <div id="monthly-selector" style="display: none" class="form-row">
+      <label for="month-select">Month</label>
+      <select id="month-select" onchange="onMonthChange()">
+        <option value="0">January</option>
+        <option value="1">February</option>
+        <option value="2">March</option>
+        <option value="3">April</option>
+        <option value="4">May</option>
+        <option value="5">June</option>
+        <option value="6">July</option>
+        <option value="7">August</option>
+        <option value="8">September</option>
+        <option value="9">October</option>
+        <option value="10">November</option>
+        <option value="11">December</option>
+      </select>
+    </div>
+
+    <!-- Opacity slider -->
+    <div class="form-row">
+      <label for="layer-opacity"
+        >Overlay Opacity: <span id="opacity-val">80%</span></label
+      >
+      <input
+        type="range"
+        id="layer-opacity"
+        min="0"
+        max="100"
+        value="80"
+        oninput="onOpacityChange(this.value)"
+      />
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="layers-map" style="height: 300px; margin-bottom: 8px"></div>
+
+  <!-- Legend -->
+  <div id="flux-legend" style="display: none">
+    <div class="legend">
+      <span>Low</span>
+      <div
+        class="legend-gradient"
+        style="
+          background: linear-gradient(
+            to right,
+            #00008b,
+            #800080,
+            #ff0000,
+            #ffa500,
+            #ffffff
+          );
+        "
+      ></div>
+      <span>High kWh/kW/yr</span>
+    </div>
+  </div>
+
+  <!-- Layer info (with gap from legend) -->
+  <div class="stats-box layers-info" id="layer-info">
+    <div class="stats-row">
+      <span class="stats-label">Imagery Date:</span>
+      <span class="stats-value" id="layer-imagery-date">-</span>
+    </div>
+    <div class="stats-row">
+      <span class="stats-label">Quality:</span>
+      <span class="stats-value" id="layer-quality">-</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // Data Layers Map & GeoTIFF Rendering
+  // ============================================================
+  var layersMap = null;
+  var layerOverlays = {};
+  var activeLayerKey = null;
+  var layerBounds = null;
+  var layerOpacity = 0.8;
+
+  // Color palettes
+  var ironPalette = [
+    "00008b",
+    "003080",
+    "004880",
+    "006080",
+    "007880",
+    "009080",
+    "00a880",
+    "00c080",
+    "00d880",
+    "00f080",
+    "20f060",
+    "40f040",
+    "60f020",
+    "80f000",
+    "a0e000",
+    "c0c000",
+    "e0a000",
+    "ff8000",
+    "ff6000",
+    "ff4000",
+    "ff2000",
+    "ff0000",
+  ];
+  var binaryPalette = ["212121", "b3e5fc"];
+
+  function onDataLayersReceived() {
+    if (!APP.dataLayers) return;
+    document.getElementById("layers-placeholder").style.display = "none";
+    document.getElementById("layers-content").style.display = "block";
+
+    var dl = APP.dataLayers;
+    document.getElementById("layer-imagery-date").textContent = dl.imageryDate
+      ? dl.imageryDate.year +
+        "-" +
+        dl.imageryDate.month +
+        "-" +
+        dl.imageryDate.day
+      : "-";
+    document.getElementById("layer-quality").textContent =
+      dl.imageryQuality || "-";
+  }
+
+  function initLayersMap() {
+    if (layersMap) {
+      layersMap.invalidateSize();
+      if (APP.lat && APP.lng) {
+        layersMap.setView([APP.lat, APP.lng], 19);
+      }
+      return;
+    }
+
+    var center = [APP.lat || 51.5124, APP.lng || -0.0913];
+    layersMap = L.map("layers-map", {
+      center: center,
+      zoom: 19,
+      zoomControl: true,
+    });
+
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Esri", maxZoom: 22 },
+    ).addTo(layersMap);
+  }
+
+  // ============================================================
+  // Toggle a data layer on/off
+  // ============================================================
+  function toggleLayer(layerKey) {
+    var btn = document.querySelector(
+      '.layer-btn[data-layer="' + layerKey + '"]',
+    );
+
+    if (activeLayerKey === layerKey) {
+      removeCurrentOverlay();
+      btn.classList.remove("active");
+      activeLayerKey = null;
+      document.getElementById("flux-legend").style.display = "none";
+      document.getElementById("monthly-selector").style.display = "none";
+      return;
+    }
+
+    removeCurrentOverlay();
+    document.querySelectorAll(".layer-btn").forEach(function (b) {
+      b.classList.remove("active");
+    });
+
+    activeLayerKey = layerKey;
+    btn.classList.add("active");
+
+    document.getElementById("monthly-selector").style.display =
+      layerKey === "monthlyFlux" ? "block" : "none";
+    document.getElementById("flux-legend").style.display =
+      layerKey === "annualFlux" || layerKey === "monthlyFlux"
+        ? "block"
+        : "none";
+
+    loadLayer(layerKey);
+  }
+
+  function removeCurrentOverlay() {
+    if (layerOverlays[activeLayerKey] && layersMap) {
+      layersMap.removeLayer(layerOverlays[activeLayerKey]);
+      delete layerOverlays[activeLayerKey];
+    }
+  }
+
+  // ============================================================
+  // Load & render a GeoTIFF layer
+  // ============================================================
+  function loadLayer(layerKey) {
+    if (!APP.dataLayers) return;
+
+    // Ensure the layers map is initialized and centered
+    if (!layersMap) initLayersMap();
+
+    var urlMap = {
+      rgb: APP.dataLayers.rgbUrl,
+      annualFlux: APP.dataLayers.annualFluxUrl,
+      monthlyFlux: APP.dataLayers.monthlyFluxUrl,
+      mask: APP.dataLayers.maskUrl,
+    };
+
+    var geoTiffUrl = urlMap[layerKey];
+    if (!geoTiffUrl) {
+      showError("URL not available for layer: " + layerKey);
+      return;
+    }
+
+    var btn = document.querySelector(
+      '.layer-btn[data-layer="' + layerKey + '"]',
+    );
+    var origLabel = {
+      rgb: "RGB",
+      annualFlux: "Annual Flux",
+      monthlyFlux: "Monthly Flux",
+      mask: "Mask",
+    };
+    if (btn) btn.textContent = "Loading...";
+
+    google.script.run
+      .withSuccessHandler(function (result) {
+        if (btn) btn.textContent = origLabel[layerKey];
+        if (!result.success) {
+          showError("GeoTIFF: " + result.error);
+          return;
+        }
+        renderGeoTiffOverlay(result.data, layerKey);
+      })
+      .withFailureHandler(function (err) {
+        if (btn) btn.textContent = origLabel[layerKey];
+        showError("GeoTIFF download failed: " + err.message);
+      })
+      .fetchGeoTiff(geoTiffUrl);
+  }
+
+  // ============================================================
+  // GeoTIFF CRS reprojection helpers
+  // ============================================================
+
+  // Get proj4 definition for common EPSG codes (UTM zones)
+  function getProj4Def(epsgCode) {
+    // WGS84 UTM North zones: EPSG 32601-32660
+    if (epsgCode >= 32601 && epsgCode <= 32660) {
+      var zone = epsgCode - 32600;
+      return "+proj=utm +zone=" + zone + " +datum=WGS84 +units=m +no_defs";
+    }
+    // WGS84 UTM South zones: EPSG 32701-32760
+    if (epsgCode >= 32701 && epsgCode <= 32760) {
+      var zone = epsgCode - 32700;
+      return (
+        "+proj=utm +zone=" + zone + " +south +datum=WGS84 +units=m +no_defs"
+      );
+    }
+    // Web Mercator
+    if (epsgCode === 3857) {
+      return "+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +no_defs";
+    }
+    return null;
+  }
+
+  // Extract WGS84 bounds from a GeoTIFF image, reprojecting if needed
+  function extractWgs84Bounds(image) {
+    var bbox;
+    try {
+      bbox = image.getBoundingBox();
+    } catch (e) {
+      console.warn("getBoundingBox failed:", e);
+    }
+
+    // Try origin + resolution as alternative
+    if (!bbox || bbox.length !== 4) {
+      try {
+        var origin = image.getOrigin();
+        var resolution = image.getResolution();
+        var w = image.getWidth();
+        var h = image.getHeight();
+        if (origin && resolution) {
+          var x1 = origin[0];
+          var y1 = origin[1];
+          var x2 = origin[0] + w * resolution[0];
+          var y2 = origin[1] + h * resolution[1];
+          bbox = [
+            Math.min(x1, x2),
+            Math.min(y1, y2),
+            Math.max(x1, x2),
+            Math.max(y1, y2),
+          ];
+        }
+      } catch (e2) {
+        console.warn("getOrigin/getResolution failed:", e2);
+      }
+    }
+
+    if (!bbox || !isFinite(bbox[0])) return null;
+
+    // Check if reprojection is needed via GeoKeys
+    var needsReproject = false;
+    var epsgCode = null;
+    try {
+      var geoKeys = image.getGeoKeys();
+      if (geoKeys.ProjectedCSTypeGeoKey) {
+        epsgCode = geoKeys.ProjectedCSTypeGeoKey;
+        needsReproject = true;
+      } else if (
+        geoKeys.GeographicTypeGeoKey &&
+        geoKeys.GeographicTypeGeoKey !== 4326
+      ) {
+        epsgCode = geoKeys.GeographicTypeGeoKey;
+        needsReproject = true;
+      }
+    } catch (e3) {
+      console.warn("getGeoKeys failed:", e3);
+    }
+
+    if (needsReproject && epsgCode && typeof proj4 !== "undefined") {
+      var projDef = getProj4Def(epsgCode);
+      if (projDef) {
+        try {
+          var sw = proj4(projDef, "WGS84", [bbox[0], bbox[1]]);
+          var ne = proj4(projDef, "WGS84", [bbox[2], bbox[3]]);
+          return [
+            [sw[1], sw[0]],
+            [ne[1], ne[0]],
+          ];
+        } catch (e4) {
+          console.warn("proj4 reprojection failed:", e4);
+        }
+      } else {
+        console.warn("Unknown EPSG code " + epsgCode + ", cannot reproject");
+      }
+    }
+
+    // If no reprojection needed or it's already WGS84, validate directly
+    var bounds = [
+      [bbox[1], bbox[0]],
+      [bbox[3], bbox[2]],
+    ];
+    if (isValidLatLngBounds(bounds)) return bounds;
+
+    return null;
+  }
+
+  // ============================================================
+  // Render GeoTIFF data onto the map
+  // ============================================================
+  function renderGeoTiffOverlay(base64Data, layerKey) {
+    var binary = atob(base64Data);
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+
+    GeoTIFF.fromArrayBuffer(bytes.buffer)
+      .then(function (tiff) {
+        return tiff.getImage();
+      })
+      .then(function (image) {
+        var width = image.getWidth();
+        var height = image.getHeight();
+
+        // Extract and reproject bounds to WGS84
+        var bounds = extractWgs84Bounds(image);
+
+        // Last fallback: use the location + radius
+        if (!bounds) {
+          var r = (APP.radiusMeters || 50) / 111000;
+          bounds = [
+            [APP.lat - r, APP.lng - r],
+            [APP.lat + r, APP.lng + r],
+          ];
+          console.warn("Using fallback bounds from location + radius");
+        }
+
+        layerBounds = bounds;
+
+        return image.readRasters().then(function (rasters) {
+          var canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          var ctx = canvas.getContext("2d");
+          var imgData = ctx.createImageData(width, height);
+
+          if (layerKey === "rgb") {
+            renderRGBToCanvas(rasters, imgData);
+          } else if (layerKey === "annualFlux") {
+            renderPaletteToCanvas(
+              rasters[0],
+              imgData,
+              ironPalette,
+              width,
+              height,
+            );
+          } else if (layerKey === "monthlyFlux") {
+            var month =
+              parseInt(document.getElementById("month-select").value) || 0;
+            var band = rasters[Math.min(month, rasters.length - 1)];
+            renderPaletteToCanvas(band, imgData, ironPalette, width, height);
+          } else if (layerKey === "mask") {
+            renderPaletteToCanvas(
+              rasters[0],
+              imgData,
+              binaryPalette,
+              width,
+              height,
+            );
+          }
+
+          ctx.putImageData(imgData, 0, 0);
+
+          var dataUrl = canvas.toDataURL();
+          var overlay = L.imageOverlay(dataUrl, bounds, {
+            opacity: layerOpacity,
+          });
+
+          if (layersMap) {
+            overlay.addTo(layersMap);
+            layerOverlays[layerKey] = overlay;
+            layersMap.fitBounds(bounds);
+          }
+        });
+      })
+      .catch(function (err) {
+        showError("GeoTIFF parse error: " + err.message);
+        console.error("GeoTIFF error:", err);
+      });
+  }
+
+  // Validate that bounds look like lat/lng (not projected coords)
+  function isValidLatLngBounds(bounds) {
+    var south = bounds[0][0],
+      west = bounds[0][1];
+    var north = bounds[1][0],
+      east = bounds[1][1];
+    return (
+      south >= -90 &&
+      south <= 90 &&
+      north >= -90 &&
+      north <= 90 &&
+      west >= -180 &&
+      west <= 180 &&
+      east >= -180 &&
+      east <= 180 &&
+      south < north &&
+      west < east
+    );
+  }
+
+  // ============================================================
+  // Canvas rendering helpers
+  // ============================================================
+  function renderRGBToCanvas(rasters, imgData) {
+    var r = rasters[0],
+      g = rasters[1],
+      b = rasters[2];
+    for (var i = 0; i < r.length; i++) {
+      var idx = i * 4;
+      imgData.data[idx] = r[i];
+      imgData.data[idx + 1] = g[i];
+      imgData.data[idx + 2] = b[i];
+      imgData.data[idx + 3] = 255;
+    }
+  }
+
+  function renderPaletteToCanvas(band, imgData, palette, width, height) {
+    var min = Infinity,
+      max = -Infinity;
+    for (var i = 0; i < band.length; i++) {
+      var v = band[i];
+      if (isFinite(v) && v !== 0) {
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+    }
+    if (min === Infinity) {
+      min = 0;
+      max = 1;
+    }
+    var range = max - min || 1;
+
+    for (var j = 0; j < band.length; j++) {
+      var idx = j * 4;
+      var val = band[j];
+
+      if (!isFinite(val) || val === 0) {
+        imgData.data[idx + 3] = 0;
+        continue;
+      }
+
+      var normalized = Math.max(0, Math.min(1, (val - min) / range));
+      var colorIdx = Math.floor(normalized * (palette.length - 1));
+      var hex = palette[Math.min(colorIdx, palette.length - 1)];
+      var rgb = hexToRgb(hex);
+
+      imgData.data[idx] = rgb.r;
+      imgData.data[idx + 1] = rgb.g;
+      imgData.data[idx + 2] = rgb.b;
+      imgData.data[idx + 3] = 230;
+    }
+  }
+
+  function hexToRgb(hex) {
+    var bigint = parseInt(hex, 16);
+    return {
+      r: (bigint >> 16) & 255,
+      g: (bigint >> 8) & 255,
+      b: bigint & 255,
+    };
+  }
+
+  // ============================================================
+  // Layer controls
+  // ============================================================
+  function onMonthChange() {
+    if (activeLayerKey === "monthlyFlux") {
+      removeCurrentOverlay();
+      loadLayer("monthlyFlux");
+    }
+  }
+
+  function onOpacityChange(val) {
+    layerOpacity = val / 100;
+    document.getElementById("opacity-val").textContent = val + "%";
+    if (layerOverlays[activeLayerKey]) {
+      layerOverlays[activeLayerKey].setOpacity(layerOpacity);
+    }
+  }
+</script>

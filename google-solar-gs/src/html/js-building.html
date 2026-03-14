@@ -1,0 +1,482 @@
+<!-- Building Insights Tab: Summary, controls, panels map, tables, inject buttons -->
+
+<div id="building-placeholder" class="placeholder">
+  <p><strong>No data yet</strong></p>
+  <p>Use the Location tab to select a building and fetch solar data.</p>
+</div>
+
+<div id="building-content" style="display: none">
+  <!-- Summary Cards -->
+  <div class="card-grid" id="summary-cards"></div>
+  <button class="btn-inject" onclick="injectSummary(this)">
+    <span class="inject-icon">&#8677;</span> Inject Summary to Sheet
+  </button>
+
+  <!-- Customisation Controls -->
+  <div class="card" style="margin-top: 10px">
+    <h4>Configuration</h4>
+
+    <div class="form-row">
+      <label for="ctrl-panel-count"
+        >Number of Panels:
+        <span id="ctrl-panel-count-val" class="slider-value">0</span></label
+      >
+      <input type="range" id="ctrl-panel-count" min="1" max="100" value="1" />
+    </div>
+
+    <div class="form-row-inline">
+      <div>
+        <label for="ctrl-capacity">Panel Capacity (W)</label>
+        <input
+          type="number"
+          id="ctrl-capacity"
+          min="100"
+          max="1000"
+          step="10"
+          value="250"
+        />
+      </div>
+      <div>
+        <label for="ctrl-degradation">Degradation (%/yr)</label>
+        <input
+          type="number"
+          id="ctrl-degradation"
+          min="0"
+          max="5"
+          step="0.1"
+          value="0.5"
+        />
+      </div>
+    </div>
+
+    <div class="form-row" style="margin-top: 4px">
+      <div class="stats-box" id="config-energy-display">
+        <div class="stats-row">
+          <span class="stats-label">Selected config energy:</span>
+          <span class="stats-value" id="config-energy-value">-</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Solar Potential Summary -->
+  <div class="section">
+    <h3>Solar Potential</h3>
+    <div class="stats-box" id="solar-potential-stats"></div>
+  </div>
+
+  <!-- Individual Panels Map -->
+  <div class="section">
+    <h3>Panel Locations</h3>
+    <div class="panel-map-container">
+      <div id="panels-map" style="height: 250px"></div>
+    </div>
+    <div class="panels-legend">
+      <span>Low energy</span>
+      <div class="panels-legend-gradient"></div>
+      <span>High energy</span>
+    </div>
+    <p style="font-size: 10px; color: var(--text-secondary); margin-top: 0">
+      Panel positions may appear offset from the roof due to differences between
+      satellite imagery sources.
+    </p>
+  </div>
+
+  <!-- Roof Segments Table -->
+  <div class="section">
+    <h3>Roof Segments</h3>
+    <div class="table-container" id="roof-segments-table"></div>
+    <button class="btn-inject" onclick="injectRoofSegments(this)">
+      <span class="inject-icon">&#8677;</span> Inject to Sheet
+    </button>
+  </div>
+
+  <!-- Individual Panels Table -->
+  <div class="section">
+    <h3>
+      Individual Panels
+      <span
+        id="panels-count-label"
+        style="
+          font-weight: normal;
+          color: var(--text-secondary);
+          font-size: 12px;
+        "
+      ></span>
+    </h3>
+    <div class="table-container" id="panels-table"></div>
+    <button class="btn-inject" onclick="injectPanels(this)">
+      <span class="inject-icon">&#8677;</span> Inject to Sheet
+    </button>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // Building Insights Display
+  // ============================================================
+  function renderBuildingInsights() {
+    var bi = APP.buildingInsights;
+    if (!bi) return;
+
+    document.getElementById("building-placeholder").style.display = "none";
+    document.getElementById("building-content").style.display = "block";
+
+    var sp = bi.solarPotential || {};
+
+    var slider = document.getElementById("ctrl-panel-count");
+    slider.max = sp.maxArrayPanelsCount || 1;
+    slider.value = sp.maxArrayPanelsCount || 1;
+    APP.panelCount = sp.maxArrayPanelsCount || 1;
+    document.getElementById("ctrl-panel-count-val").textContent = slider.value;
+
+    document.getElementById("ctrl-capacity").value =
+      sp.panelCapacityWatts || 250;
+    APP.defaultCapacityWatts = sp.panelCapacityWatts || 250;
+
+    renderSummaryCards(bi);
+    renderSolarPotential(sp);
+    renderRoofSegments(sp.roofSegmentStats || []);
+    renderPanelsTable(sp);
+    updateConfigEnergy();
+    renderPanelsOnMap(sp);
+  }
+
+  function renderSummaryCards(bi) {
+    var sp = bi.solarPotential || {};
+    var cards = [
+      {
+        label: "Max Panels",
+        value: sp.maxArrayPanelsCount || 0,
+        unit: "panels",
+      },
+      {
+        label: "Max Array Area",
+        value: (sp.maxArrayAreaMeters2 || 0).toFixed(1),
+        unit: "m\u00B2",
+      },
+      {
+        label: "Sunshine",
+        value: (sp.maxSunshineHoursPerYear || 0).toFixed(0),
+        unit: "hrs/yr",
+      },
+      {
+        label: "CO\u2082 Offset",
+        value: (sp.carbonOffsetFactorKgPerMwh || 0).toFixed(1),
+        unit: "kg/MWh",
+      },
+    ];
+
+    var html = "";
+    cards.forEach(function (c) {
+      html +=
+        '<div class="card"><h4>' +
+        c.label +
+        "</h4>" +
+        '<span class="card-value">' +
+        c.value +
+        "</span>" +
+        '<span class="card-unit">' +
+        c.unit +
+        "</span></div>";
+    });
+    document.getElementById("summary-cards").innerHTML = html;
+  }
+
+  function renderSolarPotential(sp) {
+    var wrs = sp.wholeRoofStats || {};
+    var rows = [
+      ["Roof Area (total)", (wrs.areaMeters2 || 0).toFixed(1) + " m\u00B2"],
+      [
+        "Roof Area (ground)",
+        (wrs.groundAreaMeters2 || 0).toFixed(1) + " m\u00B2",
+      ],
+      ["Roof Segments", (sp.roofSegmentStats || []).length],
+      ["Panel Capacity", (sp.panelCapacityWatts || "-") + " W"],
+      ["Panel Lifetime", (sp.panelLifetimeYears || "-") + " yrs"],
+      ["Panel Configs", (sp.solarPanelConfigs || []).length],
+    ];
+
+    var html = "";
+    rows.forEach(function (r) {
+      html +=
+        '<div class="stats-row"><span class="stats-label">' +
+        r[0] +
+        '</span><span class="stats-value">' +
+        r[1] +
+        "</span></div>";
+    });
+    document.getElementById("solar-potential-stats").innerHTML = html;
+  }
+
+  function renderRoofSegments(segments) {
+    if (!segments || segments.length === 0) {
+      document.getElementById("roof-segments-table").innerHTML =
+        '<p class="placeholder">No roof segment data</p>';
+      return;
+    }
+    var html =
+      "<table><thead><tr><th>#</th><th>Pitch (\u00B0)</th><th>Azimuth (\u00B0)</th><th>Area (m\u00B2)</th><th>Height (m)</th></tr></thead><tbody>";
+    segments.forEach(function (seg, i) {
+      html +=
+        "<tr>" +
+        "<td>" +
+        i +
+        "</td>" +
+        "<td>" +
+        (seg.pitchDegrees || 0).toFixed(2) +
+        "</td>" +
+        "<td>" +
+        (seg.azimuthDegrees || 0).toFixed(2) +
+        "</td>" +
+        "<td>" +
+        (seg.stats ? seg.stats.areaMeters2.toFixed(1) : "-") +
+        "</td>" +
+        "<td>" +
+        (seg.planeHeightAtCenterMeters || 0).toFixed(1) +
+        "</td>" +
+        "</tr>";
+    });
+    html += "</tbody></table>";
+    document.getElementById("roof-segments-table").innerHTML = html;
+  }
+
+  function renderPanelsTable(sp) {
+    var panels = sp.solarPanels || [];
+    var segments = sp.roofSegmentStats || [];
+    var ratio = getCapacityRatio();
+    var count = Math.min(APP.panelCount, panels.length);
+
+    document.getElementById("panels-count-label").textContent =
+      "(" + count + " of " + panels.length + ")";
+
+    if (panels.length === 0) {
+      document.getElementById("panels-table").innerHTML =
+        '<p class="placeholder">No panel data</p>';
+      return;
+    }
+
+    var html =
+      "<table><thead><tr><th>#</th><th>Seg</th><th>Lat</th><th>Lng</th><th>Energy</th><th>Pitch</th><th>Azimuth</th><th>Orient</th></tr></thead><tbody>";
+    for (var i = 0; i < count; i++) {
+      var p = panels[i];
+      var segIdx = p.segmentIndex || 0;
+      var seg = segments[segIdx] || {};
+      var energy = ((p.yearlyEnergyDcKwh || 0) * ratio).toFixed(1);
+      html +=
+        "<tr>" +
+        "<td>" +
+        (i + 1) +
+        "</td>" +
+        "<td>" +
+        segIdx +
+        "</td>" +
+        "<td>" +
+        (p.center ? p.center.latitude.toFixed(6) : "-") +
+        "</td>" +
+        "<td>" +
+        (p.center ? p.center.longitude.toFixed(6) : "-") +
+        "</td>" +
+        "<td>" +
+        energy +
+        "</td>" +
+        "<td>" +
+        (seg.pitchDegrees || 0).toFixed(1) +
+        "</td>" +
+        "<td>" +
+        (seg.azimuthDegrees || 0).toFixed(1) +
+        "</td>" +
+        "<td>" +
+        (p.orientation || "L").charAt(0) +
+        "</td>" +
+        "</tr>";
+    }
+    html += "</tbody></table>";
+    document.getElementById("panels-table").innerHTML = html;
+  }
+
+  // ============================================================
+  // Individual Panels Map (Leaflet)
+  // ============================================================
+  var panelsMap = null;
+  var panelMarkers = [];
+
+  function initPanelsMap() {
+    if (panelsMap) {
+      panelsMap.invalidateSize();
+      return;
+    }
+    if (!APP.buildingInsights) return;
+
+    var center = [APP.lat || 51.5124, APP.lng || -0.0913];
+    panelsMap = L.map("panels-map", {
+      center: center,
+      zoom: 19,
+      zoomControl: true,
+    });
+
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Esri", maxZoom: 22 },
+    ).addTo(panelsMap);
+
+    renderPanelsOnMap(APP.buildingInsights.solarPotential || {});
+  }
+
+  function renderPanelsOnMap(sp) {
+    if (!panelsMap) return;
+
+    // Clear existing markers
+    panelMarkers.forEach(function (m) {
+      panelsMap.removeLayer(m);
+    });
+    panelMarkers = [];
+
+    var panels = sp.solarPanels || [];
+    var count = Math.min(APP.panelCount, panels.length);
+    var ratio = getCapacityRatio();
+
+    if (count === 0) return;
+
+    // Compute min/max energy for color scaling
+    var minE = Infinity,
+      maxE = -Infinity;
+    for (var i = 0; i < count; i++) {
+      var e = (panels[i].yearlyEnergyDcKwh || 0) * ratio;
+      if (e < minE) minE = e;
+      if (e > maxE) maxE = e;
+    }
+    var rangeE = maxE - minE || 1;
+
+    // Choose marker radius based on panel count
+    var radius = count > 500 ? 2 : count > 100 ? 3 : 4;
+
+    var bounds = [];
+    for (var j = 0; j < count; j++) {
+      var p = panels[j];
+      if (!p.center) continue;
+      var lat = p.center.latitude;
+      var lng = p.center.longitude;
+      var energy = (p.yearlyEnergyDcKwh || 0) * ratio;
+      var norm = (energy - minE) / rangeE;
+
+      // Color: blue (low) → red (high)
+      var r = Math.round(norm * 255);
+      var b = Math.round((1 - norm) * 255);
+      var color = "rgb(" + r + ",50," + b + ")";
+
+      var marker = L.circleMarker([lat, lng], {
+        radius: radius,
+        fillColor: color,
+        fillOpacity: 0.85,
+        color: "#fff",
+        weight: 0.5,
+      })
+        .bindTooltip("#" + (j + 1) + ": " + energy.toFixed(1) + " kWh/yr", {
+          direction: "top",
+        })
+        .addTo(panelsMap);
+
+      panelMarkers.push(marker);
+      bounds.push([lat, lng]);
+    }
+
+    if (bounds.length > 0) {
+      panelsMap.fitBounds(bounds, { padding: [20, 20], maxZoom: 20 });
+    }
+  }
+
+  // ============================================================
+  // Control Event Handlers
+  // ============================================================
+  document.addEventListener("DOMContentLoaded", function () {
+    document
+      .getElementById("ctrl-panel-count")
+      .addEventListener("input", function () {
+        APP.panelCount = parseInt(this.value);
+        document.getElementById("ctrl-panel-count-val").textContent =
+          this.value;
+        updateConfigEnergy();
+        if (APP.buildingInsights) {
+          var sp = APP.buildingInsights.solarPotential || {};
+          renderPanelsTable(sp);
+          renderPanelsOnMap(sp);
+        }
+        if (typeof renderAllCharts === "function") renderAllCharts();
+      });
+
+    document
+      .getElementById("ctrl-capacity")
+      .addEventListener("change", function () {
+        var val = parseInt(this.value);
+        if (val && val > 0) {
+          APP.panelCapacityWatts = val;
+        } else {
+          APP.panelCapacityWatts = null;
+        }
+        updateConfigEnergy();
+        if (APP.buildingInsights) {
+          var sp = APP.buildingInsights.solarPotential || {};
+          renderPanelsTable(sp);
+          renderPanelsOnMap(sp);
+        }
+        if (typeof renderAllCharts === "function") renderAllCharts();
+      });
+
+    document
+      .getElementById("ctrl-degradation")
+      .addEventListener("change", function () {
+        APP.degradationRate = parseFloat(this.value) / 100 || 0.005;
+        if (typeof renderAllCharts === "function") renderAllCharts();
+      });
+  });
+
+  function updateConfigEnergy() {
+    var sp = APP.buildingInsights ? APP.buildingInsights.solarPotential : null;
+    if (!sp || !sp.solarPanelConfigs) return;
+
+    var configs = sp.solarPanelConfigs;
+    var ratio = getCapacityRatio();
+    var energy = 0;
+
+    for (var i = 0; i < configs.length; i++) {
+      if (configs[i].panelsCount >= APP.panelCount) {
+        energy = (configs[i].yearlyEnergyDcKwh || 0) * ratio;
+        break;
+      }
+    }
+    if (energy === 0 && configs.length > 0) {
+      energy = (configs[configs.length - 1].yearlyEnergyDcKwh || 0) * ratio;
+    }
+
+    document.getElementById("config-energy-value").textContent =
+      energy.toFixed(1) + " kWh/yr";
+  }
+
+  // ============================================================
+  // Inject to Sheet handlers
+  // ============================================================
+  function injectSummary(btn) {
+    if (!APP.buildingInsights) return;
+    injectToSheet(btn, "writeSolarSummary", [APP.buildingInsights]);
+  }
+
+  function injectRoofSegments(btn) {
+    if (!APP.buildingInsights) return;
+    injectToSheet(btn, "writeRoofSegments", [
+      APP.buildingInsights,
+      APP.lat,
+      APP.lng,
+    ]);
+  }
+
+  function injectPanels(btn) {
+    if (!APP.buildingInsights) return;
+    injectToSheet(btn, "writeIndividualPanels", [
+      APP.buildingInsights,
+      APP.panelCapacityWatts,
+      APP.lat,
+      APP.lng,
+    ]);
+  }
+</script>

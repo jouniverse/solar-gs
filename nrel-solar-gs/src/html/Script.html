@@ -1,0 +1,298 @@
+<script>
+(function() {
+  // -----------------------------------------------------------------------
+  // State
+  // -----------------------------------------------------------------------
+  var map, marker;
+  var latInput = document.getElementById('lat');
+  var lonInput = document.getElementById('lon');
+
+  // -----------------------------------------------------------------------
+  // API Key check
+  // -----------------------------------------------------------------------
+  google.script.run
+    .withSuccessHandler(function(key) {
+      if (!key) document.getElementById('apiKeyBanner').style.display = 'block';
+    })
+    .getApiKey();
+
+  window.saveApiKey = function() {
+    var key = document.getElementById('apiKeyInput').value.trim();
+    if (!key) return;
+    google.script.run
+      .withSuccessHandler(function(ok) {
+        if (ok) document.getElementById('apiKeyBanner').style.display = 'none';
+      })
+      .saveApiKey(key);
+  };
+
+  // -----------------------------------------------------------------------
+  // Leaflet Map
+  // -----------------------------------------------------------------------
+  function initMap() {
+    var lat = parseFloat(latInput.value) || 40;
+    var lon = parseFloat(lonInput.value) || -105;
+
+    map = L.map('map', {
+      zoomControl: true,
+      attributionControl: false
+    }).setView([lat, lon], 5);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18
+    }).addTo(map);
+
+    marker = L.marker([lat, lon], { draggable: true }).addTo(map);
+
+    marker.on('dragend', function() {
+      var pos = marker.getLatLng();
+      latInput.value = pos.lat.toFixed(6);
+      lonInput.value = pos.lng.toFixed(6);
+    });
+
+    map.on('click', function(e) {
+      marker.setLatLng(e.latlng);
+      latInput.value = e.latlng.lat.toFixed(6);
+      lonInput.value = e.latlng.lng.toFixed(6);
+    });
+  }
+
+  function syncMapFromInputs() {
+    var lat = parseFloat(latInput.value);
+    var lon = parseFloat(lonInput.value);
+    if (!isNaN(lat) && !isNaN(lon) && map && marker) {
+      marker.setLatLng([lat, lon]);
+      map.panTo([lat, lon]);
+    }
+  }
+
+  latInput.addEventListener('change', syncMapFromInputs);
+  lonInput.addEventListener('change', syncMapFromInputs);
+
+  setTimeout(initMap, 100);
+
+  // -----------------------------------------------------------------------
+  // Tab Switching
+  // -----------------------------------------------------------------------
+  var tabs = document.querySelectorAll('.tab');
+  var panels = document.querySelectorAll('.panel');
+
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      tabs.forEach(function(t) { t.classList.remove('active'); });
+      panels.forEach(function(p) { p.classList.remove('active'); });
+      tab.classList.add('active');
+      var target = document.getElementById(tab.getAttribute('data-target'));
+      if (target) target.classList.add('active');
+      clearResults();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // UI Helpers
+  // -----------------------------------------------------------------------
+  function showSpinner(show) {
+    document.getElementById('spinner').style.display = show ? 'flex' : 'none';
+  }
+
+  function setStatus(msg, type) {
+    var el = document.getElementById('status');
+    el.className = 'status' + (type ? ' ' + type : '');
+    el.textContent = msg;
+  }
+
+  function clearResults() {
+    setStatus('', '');
+    document.getElementById('resultCards').innerHTML = '';
+  }
+
+  function disableButtons(disabled) {
+    document.querySelectorAll('.btn-primary').forEach(function(b) {
+      b.disabled = disabled;
+    });
+  }
+
+  function handleError(err) {
+    showSpinner(false);
+    disableButtons(false);
+    setStatus(err.message || String(err), 'error');
+  }
+
+  function val(id) {
+    var el = document.getElementById(id);
+    if (!el) return '';
+    if (el.type === 'checkbox') return el.checked;
+    return el.value;
+  }
+
+  function numOrEmpty(id) {
+    var v = val(id);
+    return v !== '' ? v : '';
+  }
+
+  // -----------------------------------------------------------------------
+  // Validation
+  // -----------------------------------------------------------------------
+  function validateLocation() {
+    var lat = parseFloat(latInput.value);
+    var lon = parseFloat(lonInput.value);
+    if (isNaN(lat) || lat < -90 || lat > 90) {
+      setStatus('Latitude must be between -90 and 90.', 'error');
+      return false;
+    }
+    if (isNaN(lon) || lon < -180 || lon > 180) {
+      setStatus('Longitude must be between -180 and 180.', 'error');
+      return false;
+    }
+    return true;
+  }
+
+  // -----------------------------------------------------------------------
+  // PVWatts V8
+  // -----------------------------------------------------------------------
+  window.submitPVWatts = function() {
+    clearResults();
+    if (!validateLocation()) return;
+
+    var params = {
+      lat: val('lat'),
+      lon: val('lon'),
+      system_capacity: val('system_capacity'),
+      module_type: val('module_type'),
+      losses: val('losses'),
+      array_type: val('array_type'),
+      tilt: val('tilt'),
+      azimuth: val('azimuth'),
+      dataset: val('dataset'),
+      dc_ac_ratio: val('dc_ac_ratio'),
+      gcr: val('gcr'),
+      inv_eff: val('inv_eff'),
+      radius: val('radius'),
+      timeframe: val('timeframe'),
+      bifaciality: numOrEmpty('bifaciality'),
+      albedo: numOrEmpty('albedo'),
+      soiling: val('soiling'),
+      use_wf_albedo: numOrEmpty('use_wf_albedo')
+    };
+
+    showSpinner(true);
+    disableButtons(true);
+    google.script.run
+      .withSuccessHandler(onPVWattsSuccess)
+      .withFailureHandler(handleError)
+      .queryPVWatts(params);
+  };
+
+  function onPVWattsSuccess(result) {
+    showSpinner(false);
+    disableButtons(false);
+    setStatus('Results written to "PVWatts V8" sheet.', 'success');
+    renderPVWattsCards(result);
+  }
+
+  function renderPVWattsCards(r) {
+    var container = document.getElementById('resultCards');
+    var html = '';
+
+    html += '<div class="result-card">';
+    html += '<div class="highlight">' + r.ac_annual.toFixed(1) + ' kWh</div>';
+    html += '<div class="highlight-label">Annual AC Output</div>';
+    html += '<table>';
+    html += '<tr><td>Solar Radiation</td><td>' + r.solrad_annual.toFixed(2) + ' kWh/m\u00B2/day</td></tr>';
+    html += '<tr><td>Capacity Factor</td><td>' + r.capacity_factor.toFixed(2) + ' %</td></tr>';
+    html += '</table>';
+    html += '</div>';
+
+    if (r.station_info) {
+      var s = r.station_info;
+      html += '<div class="result-card">';
+      html += '<h4>Station Info</h4>';
+      html += '<table>';
+      html += '<tr><td>Location</td><td>' + [s.city, s.state].filter(Boolean).join(', ') + '</td></tr>';
+      html += '<tr><td>Lat / Lon</td><td>' + (s.lat || '') + ', ' + (s.lon || '') + '</td></tr>';
+      html += '<tr><td>Elevation</td><td>' + (s.elev || '') + ' m</td></tr>';
+      html += '<tr><td>Timezone</td><td>GMT ' + (s.tz || '') + '</td></tr>';
+      html += '<tr><td>Distance</td><td>' + (s.distance || '') + ' m</td></tr>';
+      html += '<tr><td>Source</td><td>' + (s.weather_data_source || '') + '</td></tr>';
+      html += '</table>';
+      html += '</div>';
+    }
+
+    if (r.warnings && r.warnings.length) {
+      html += '<div class="result-card">';
+      html += '<h4>Warnings</h4>';
+      html += '<p style="font-size:12px;color:#7c5a00;">' + r.warnings.join('<br>') + '</p>';
+      html += '</div>';
+    }
+
+    container.innerHTML = html;
+  }
+
+  // -----------------------------------------------------------------------
+  // Solar Resource Data
+  // -----------------------------------------------------------------------
+  window.submitSolarResource = function() {
+    clearResults();
+    if (!validateLocation()) return;
+
+    showSpinner(true);
+    disableButtons(true);
+    google.script.run
+      .withSuccessHandler(onSolarResourceSuccess)
+      .withFailureHandler(handleError)
+      .querySolarResource({ lat: val('lat'), lon: val('lon') });
+  };
+
+  function onSolarResourceSuccess(result) {
+    showSpinner(false);
+    disableButtons(false);
+    setStatus('Results written to "Solar Resource" sheet.', 'success');
+
+    var container = document.getElementById('resultCards');
+    var html = '<div class="result-card">';
+    html += '<h4>Annual Averages (kWh/m\u00B2/day)</h4>';
+    html += '<table>';
+    html += '<tr><td>Direct Normal Irradiance</td><td>' + result.annual_dni + '</td></tr>';
+    html += '<tr><td>Global Horizontal Irradiance</td><td>' + result.annual_ghi + '</td></tr>';
+    html += '<tr><td>Tilt at Latitude</td><td>' + result.annual_tilt + '</td></tr>';
+    html += '</table>';
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  // -----------------------------------------------------------------------
+  // Solar Dataset Query V2
+  // -----------------------------------------------------------------------
+  window.submitDatasetQuery = function() {
+    clearResults();
+    if (!validateLocation()) return;
+
+    var params = {
+      lat: val('lat'),
+      lon: val('lon'),
+      radius: val('dq_radius'),
+      all: val('dq_all')
+    };
+
+    showSpinner(true);
+    disableButtons(true);
+    google.script.run
+      .withSuccessHandler(onDatasetQuerySuccess)
+      .withFailureHandler(handleError)
+      .queryDatasetQuery(params);
+  };
+
+  function onDatasetQuerySuccess(result) {
+    showSpinner(false);
+    disableButtons(false);
+    setStatus('Results written to "Dataset Query" sheet. Found ' + result.datasetCount + ' dataset(s).', 'success');
+
+    if (result.warnings && result.warnings.length) {
+      var container = document.getElementById('resultCards');
+      container.innerHTML = '<div class="result-card"><h4>Warnings</h4><p style="font-size:12px;color:#7c5a00;">'
+        + result.warnings.join('<br>') + '</p></div>';
+    }
+  }
+
+})();
+</script>

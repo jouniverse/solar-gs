@@ -1,0 +1,81 @@
+<!-- TMY Tab -->
+<div class="tab-title">Typical Meteorological Year</div>
+<div class="location-display">Location: 45, 8</div>
+
+<form id="form-tmy" onsubmit="return false;">
+  <div class="form-group">
+    <label for="tmy-raddatabase">Solar radiation database / period</label>
+    <select name="raddatabase" id="tmy-raddatabase" onchange="updateTmyYears()">
+      <option value="PVGIS-SARAH3" data-min="2005" data-max="2023">
+        PVGIS-SARAH3: 2005 - 2023
+      </option>
+      <option value="PVGIS-ERA5" data-min="2005" data-max="2023">
+        PVGIS-ERA5: 2005 - 2023
+      </option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label for="tmy-startyear">Start year</label>
+      <select name="startyear" id="tmy-startyear"></select>
+    </div>
+    <div class="form-group">
+      <label for="tmy-endyear">End year</label>
+      <select name="endyear" id="tmy-endyear"></select>
+    </div>
+  </div>
+
+  <p style="font-size: 11px; color: #5f6368; margin: 8px 0">
+    The period must be at least 10 years.
+  </p>
+
+  <button class="btn-primary" onclick="validateTmyAndFetch()">
+    Fetch Data
+  </button>
+</form>
+
+<script>
+  function updateTmyYears() {
+    var db = document.getElementById("tmy-raddatabase");
+    var opt = db.options[db.selectedIndex];
+    var minY = parseInt(opt.getAttribute("data-min"));
+    var maxY = parseInt(opt.getAttribute("data-max"));
+
+    var startSel = document.getElementById("tmy-startyear");
+    var endSel = document.getElementById("tmy-endyear");
+    startSel.innerHTML = "";
+    endSel.innerHTML = "";
+
+    for (var y = minY; y <= maxY; y++) {
+      var o1 = document.createElement("option");
+      o1.value = y;
+      o1.textContent = y;
+      startSel.appendChild(o1);
+      var o2 = document.createElement("option");
+      o2.value = y;
+      o2.textContent = y;
+      endSel.appendChild(o2);
+    }
+    startSel.value = String(minY);
+    endSel.value = String(maxY);
+  }
+
+  function validateTmyAndFetch() {
+    var start = parseInt(document.getElementById("tmy-startyear").value);
+    var end = parseInt(document.getElementById("tmy-endyear").value);
+    if (end - start < 10) {
+      showStatus(
+        "error",
+        "TMY period must be at least 10 years (currently " +
+          (end - start) +
+          ").",
+      );
+      return;
+    }
+    fetchData("fetchTMY", "form-tmy");
+  }
+
+  // Initialize on load
+  updateTmyYears();
+</script>

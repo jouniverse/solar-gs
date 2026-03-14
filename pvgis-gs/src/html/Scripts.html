@@ -1,0 +1,242 @@
+<script>
+  // ─── State ─────────────────────────────────────────────────────────────────
+  var appState = {
+    lat: 45.0,
+    lon: 8.0,
+    map: null,
+    marker: null,
+  };
+
+  // ─── Init ──────────────────────────────────────────────────────────────────
+  document.addEventListener("DOMContentLoaded", function () {
+    initTabs();
+    initCollapsibles();
+    loadSavedLocation();
+  });
+
+  // ─── Tab Management ────────────────────────────────────────────────────────
+  function initTabs() {
+    var btns = document.querySelectorAll(".tab-btn");
+    btns.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var tabId = btn.getAttribute("data-tab");
+        switchTab(tabId);
+      });
+    });
+  }
+
+  function switchTab(tabId) {
+    document.querySelectorAll(".tab-btn").forEach(function (b) {
+      b.classList.remove("active");
+    });
+    document.querySelectorAll(".tab-content").forEach(function (c) {
+      c.classList.remove("active");
+    });
+
+    var btn = document.querySelector('.tab-btn[data-tab="' + tabId + '"]');
+    var content = document.getElementById("tab-" + tabId);
+    if (btn) btn.classList.add("active");
+    if (content) content.classList.add("active");
+
+    // Re-invalidate map size when switching to location tab
+    if (tabId === "location" && appState.map) {
+      setTimeout(function () {
+        appState.map.invalidateSize();
+      }, 100);
+    }
+  }
+
+  // ─── Collapsible Sections ──────────────────────────────────────────────────
+  function initCollapsibles() {
+    document.querySelectorAll(".collapsible-toggle").forEach(function (toggle) {
+      toggle.addEventListener("click", function () {
+        toggle.classList.toggle("open");
+        var content = toggle.nextElementSibling;
+        if (content && content.classList.contains("collapsible-content")) {
+          content.classList.toggle("open");
+        }
+      });
+    });
+  }
+
+  // ─── Map Initialization ───────────────────────────────────────────────────
+  function initMap() {
+    if (appState.map) return;
+
+    appState.map = L.map("location-map").setView(
+      [appState.lat, appState.lon],
+      5,
+    );
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OSM",
+      maxZoom: 18,
+    }).addTo(appState.map);
+
+    appState.marker = L.marker([appState.lat, appState.lon], {
+      draggable: true,
+    }).addTo(appState.map);
+
+    appState.map.on("click", function (e) {
+      updateLocation(e.latlng.lat, e.latlng.lng);
+    });
+
+    appState.marker.on("dragend", function (e) {
+      var pos = e.target.getLatLng();
+      updateLocation(pos.lat, pos.lng);
+    });
+
+    // Fix map rendering in sidebar
+    setTimeout(function () {
+      appState.map.invalidateSize();
+    }, 200);
+  }
+
+  // ─── Location Management ──────────────────────────────────────────────────
+  function updateLocation(lat, lon) {
+    appState.lat = Math.round(lat * 1000000) / 1000000;
+    appState.lon = Math.round(lon * 1000000) / 1000000;
+
+    // Update inputs
+    var latInput = document.getElementById("input-lat");
+    var lonInput = document.getElementById("input-lon");
+    if (latInput) latInput.value = appState.lat;
+    if (lonInput) lonInput.value = appState.lon;
+
+    // Update map marker
+    if (appState.marker) {
+      appState.marker.setLatLng([appState.lat, appState.lon]);
+    }
+
+    // Update location display on all tabs
+    document.querySelectorAll(".location-display").forEach(function (el) {
+      el.textContent = "Location: " + appState.lat + ", " + appState.lon;
+    });
+
+    // Save to user properties
+    google.script.run.saveLocation(appState.lat, appState.lon);
+  }
+
+  function onLatLonInput() {
+    var lat = parseFloat(document.getElementById("input-lat").value);
+    var lon = parseFloat(document.getElementById("input-lon").value);
+    if (
+      !isNaN(lat) &&
+      !isNaN(lon) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lon >= -180 &&
+      lon <= 180
+    ) {
+      updateLocation(lat, lon);
+      if (appState.map) {
+        appState.map.setView([lat, lon], appState.map.getZoom());
+      }
+    }
+  }
+
+  function loadSavedLocation() {
+    google.script.run
+      .withSuccessHandler(function (loc) {
+        if (loc && loc.lat && loc.lon) {
+          updateLocation(loc.lat, loc.lon);
+          if (appState.map) {
+            appState.map.setView([loc.lat, loc.lon], 5);
+          }
+        }
+        // Init map after location is loaded
+        initMap();
+      })
+      .withFailureHandler(function () {
+        initMap();
+      })
+      .loadLocation();
+  }
+
+  // ─── Form Serialization ──────────────────────────────────────────────────
+  function getFormParams(formId) {
+    var form = document.getElementById(formId);
+    if (!form) return {};
+
+    var params = {
+      lat: appState.lat,
+      lon: appState.lon,
+    };
+
+    // Text, number, and hidden inputs
+    form
+      .querySelectorAll(
+        'input[type="number"], input[type="text"], input[type="hidden"], select',
+      )
+      .forEach(function (el) {
+        if (el.name && el.value !== "") {
+          params[el.name] = el.value;
+        }
+      });
+
+    // Checkboxes (value 1 if checked, omit if not)
+    form.querySelectorAll('input[type="checkbox"]').forEach(function (el) {
+      if (el.name && el.checked) {
+        params[el.name] = 1;
+      }
+    });
+
+    // Radio buttons
+    form.querySelectorAll('input[type="radio"]:checked').forEach(function (el) {
+      if (el.name) {
+        params[el.name] = el.value;
+      }
+    });
+
+    return params;
+  }
+
+  // ─── API Call Wrapper ─────────────────────────────────────────────────────
+  function fetchData(serverFunction, formId) {
+    var params = getFormParams(formId);
+    var btn = document.querySelector("#" + formId + " .btn-primary");
+
+    showStatus("loading", "Fetching data from PVGIS...");
+    if (btn) btn.disabled = true;
+
+    google.script.run
+      .withSuccessHandler(function (result) {
+        if (btn) btn.disabled = false;
+        showStatus("success", result.message, result.summary);
+      })
+      .withFailureHandler(function (error) {
+        if (btn) btn.disabled = false;
+        showStatus("error", error.message || "An error occurred.");
+      })
+      [serverFunction](params);
+  }
+
+  // ─── Status Bar ────────────────────────────────────────────────────────────
+  function showStatus(type, message, summary) {
+    var bar = document.getElementById("status-bar");
+    bar.className = "status-bar " + type;
+
+    var html = "";
+    if (type === "loading") {
+      html = '<span class="spinner"></span>' + escapeHtml(message);
+    } else {
+      html = escapeHtml(message);
+    }
+    if (summary) {
+      html += '<div class="summary">' + escapeHtml(summary) + "</div>";
+    }
+    bar.innerHTML = html;
+
+    if (type === "success") {
+      setTimeout(function () {
+        bar.className = "status-bar hidden";
+      }, 6000);
+    }
+  }
+
+  function escapeHtml(text) {
+    var div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+</script>

@@ -1,0 +1,165 @@
+<!-- Hourly Radiation Tab -->
+<div class="tab-title">Hourly Radiation</div>
+<div class="location-display">Location: 45, 8</div>
+
+<form id="form-hourly" onsubmit="return false;">
+  <div class="form-group">
+    <label for="hr-raddatabase">Solar radiation database</label>
+    <select name="raddatabase" id="hr-raddatabase">
+      <option value="PVGIS-SARAH3">PVGIS-SARAH3 (Europe, Africa, Asia)</option>
+      <option value="PVGIS-NSRDB">PVGIS-NSRDB (Americas)</option>
+      <option value="PVGIS-ERA5">PVGIS-ERA5 (Global, inc. high-lat)</option>
+      <option value="PVGIS-COSMO">PVGIS-COSMO (Europe)</option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label for="hr-startyear">Start year</label>
+      <select name="startyear" id="hr-startyear"></select>
+    </div>
+    <div class="form-group">
+      <label for="hr-endyear">End year</label>
+      <select name="endyear" id="hr-endyear"></select>
+    </div>
+  </div>
+
+  <div class="section-title">Mounting type</div>
+
+  <div class="checkbox-group">
+    <input type="radio" name="trackingtype" id="hr-fixed" value="0" checked />
+    <label for="hr-fixed">Fixed</label>
+  </div>
+  <div class="checkbox-group">
+    <input type="radio" name="trackingtype" id="hr-vert" value="3" />
+    <label for="hr-vert">Vertical axis</label>
+  </div>
+  <div class="checkbox-group">
+    <input type="radio" name="trackingtype" id="hr-inc" value="5" />
+    <label for="hr-inc">Inclined axis</label>
+  </div>
+  <div class="checkbox-group">
+    <input type="radio" name="trackingtype" id="hr-two" value="2" />
+    <label for="hr-two">Two axis</label>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label for="hr-angle">Slope (°)</label>
+      <input
+        type="number"
+        name="angle"
+        id="hr-angle"
+        value=""
+        min="0"
+        max="90"
+        step="1"
+        placeholder="0-90"
+      />
+    </div>
+    <div class="form-group">
+      <label for="hr-aspect">Azimuth (°)</label>
+      <input
+        type="number"
+        name="aspect"
+        id="hr-aspect"
+        value=""
+        min="-180"
+        max="180"
+        step="1"
+        placeholder="-180 to 180"
+      />
+    </div>
+  </div>
+
+  <div class="checkbox-group">
+    <input type="checkbox" name="optimalinclination" id="hr-optinc" value="1" />
+    <label for="hr-optinc">Optimize slope</label>
+  </div>
+  <div class="checkbox-group">
+    <input type="checkbox" name="optimalangles" id="hr-optang" value="1" />
+    <label for="hr-optang">Optimize slope and azimuth</label>
+  </div>
+
+  <button class="collapsible-toggle">PV power</button>
+  <div class="collapsible-content">
+    <div class="checkbox-group">
+      <input type="checkbox" name="pvcalculation" id="hr-pvcalc" value="1" />
+      <label for="hr-pvcalc">Calculate PV power output</label>
+    </div>
+    <div class="form-group">
+      <label for="hr-pvtechchoice">PV technology</label>
+      <select name="pvtechchoice" id="hr-pvtechchoice">
+        <option value="crystSi">Crystalline Silicon (original)</option>
+        <option value="CIS">CIS</option>
+        <option value="CdTe">CdTe</option>
+        <option value="Unknown">Unknown</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="hr-peakpower">Peak power (kWp)</label>
+        <input
+          type="number"
+          name="peakpower"
+          id="hr-peakpower"
+          value="1"
+          min="0"
+          step="0.1"
+        />
+      </div>
+      <div class="form-group">
+        <label for="hr-loss">System loss (%)</label>
+        <input
+          type="number"
+          name="loss"
+          id="hr-loss"
+          value="14"
+          min="0"
+          max="100"
+          step="0.1"
+        />
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="hr-mountingplace">Mounting position</label>
+      <select name="mountingplace" id="hr-mountingplace">
+        <option value="free">Free-standing</option>
+        <option value="building">Building-integrated</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="checkbox-group" style="margin-top: 8px">
+    <input type="checkbox" name="components" id="hr-components" value="1" />
+    <label for="hr-components"
+      >Radiation components (beam, diffuse, reflected)</label
+    >
+  </div>
+
+  <button
+    class="btn-primary"
+    onclick="fetchData('fetchHourlyRadiation', 'form-hourly')"
+  >
+    Fetch Data
+  </button>
+</form>
+
+<script>
+  (function () {
+    var startSel = document.getElementById("hr-startyear");
+    var endSel = document.getElementById("hr-endyear");
+    for (var y = 2005; y <= 2023; y++) {
+      var opt1 = document.createElement("option");
+      opt1.value = y;
+      opt1.textContent = y;
+      startSel.appendChild(opt1);
+      var opt2 = document.createElement("option");
+      opt2.value = y;
+      opt2.textContent = y;
+      endSel.appendChild(opt2);
+    }
+    startSel.value = "2005";
+    endSel.value = "2023";
+  })();
+</script>

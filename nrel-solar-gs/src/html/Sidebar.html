@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <?!= include('Styles') ?>
+</head>
+<body>
+
+  <!-- API Key Banner (shown when no key is set) -->
+  <div id="apiKeyBanner" class="api-key-banner" style="display:none;">
+    <p>No API key set.</p>
+    <div class="input-row">
+      <input type="text" id="apiKeyInput" placeholder="Enter NREL API key">
+      <button id="saveKeyBtn" class="btn btn-sm" onclick="saveApiKey()">Save</button>
+    </div>
+  </div>
+
+  <!-- Location Section -->
+  <section class="section">
+    <h3 class="section-title">Location</h3>
+    <div class="input-row">
+      <div class="field">
+        <label for="lat">Latitude</label>
+        <input type="number" id="lat" value="40.0" step="any" min="-90" max="90">
+      </div>
+      <div class="field">
+        <label for="lon">Longitude</label>
+        <input type="number" id="lon" value="-105.0" step="any" min="-180" max="180">
+      </div>
+    </div>
+    <div id="map"></div>
+  </section>
+
+  <!-- Endpoint Tabs -->
+  <nav class="tabs">
+    <button class="tab active" data-target="pvwatts">PVWatts V8</button>
+    <button class="tab" data-target="solar-resource">Solar Resource</button>
+    <button class="tab" data-target="dataset-query">Dataset Query</button>
+  </nav>
+
+  <!-- PVWatts V8 Form -->
+  <section id="pvwatts" class="panel active">
+    <div class="form-grid">
+      <div class="field">
+        <label for="system_capacity">System Capacity (kW)</label>
+        <input type="number" id="system_capacity" value="4" step="any" min="0.05" max="500000">
+      </div>
+      <div class="field">
+        <label for="module_type">Module Type</label>
+        <select id="module_type">
+          <option value="0" selected>Standard</option>
+          <option value="1">Premium</option>
+          <option value="2">Thin Film</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="losses">Losses (%)</label>
+        <input type="number" id="losses" value="14" step="any" min="-5" max="99">
+      </div>
+      <div class="field">
+        <label for="array_type">Array Type</label>
+        <select id="array_type">
+          <option value="0">Fixed - Open Rack</option>
+          <option value="1" selected>Fixed - Roof Mounted</option>
+          <option value="2">1-Axis</option>
+          <option value="3">1-Axis Backtracking</option>
+          <option value="4">2-Axis</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="tilt">Tilt (°)</label>
+        <input type="number" id="tilt" value="20" step="any" min="0" max="90">
+      </div>
+      <div class="field">
+        <label for="azimuth">Azimuth (°)</label>
+        <input type="number" id="azimuth" value="180" step="any" min="0" max="359.9">
+      </div>
+      <div class="field">
+        <label for="dataset">Dataset</label>
+        <select id="dataset">
+          <option value="nsrdb" selected>NSRDB</option>
+          <option value="tmy2">TMY2</option>
+          <option value="tmy3">TMY3</option>
+          <option value="intl">International</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Advanced Options (collapsible) -->
+    <details class="advanced">
+      <summary>Advanced Options</summary>
+      <div class="form-grid">
+        <div class="field">
+          <label for="dc_ac_ratio">DC/AC Ratio</label>
+          <input type="number" id="dc_ac_ratio" value="1.2" step="any" min="0">
+        </div>
+        <div class="field">
+          <label for="gcr">Ground Coverage Ratio</label>
+          <input type="number" id="gcr" value="0.4" step="any" min="0.01" max="0.99">
+        </div>
+        <div class="field">
+          <label for="inv_eff">Inverter Eff. (%)</label>
+          <input type="number" id="inv_eff" value="96" step="any" min="90" max="99.5">
+        </div>
+        <div class="field">
+          <label for="radius">Search Radius (mi)</label>
+          <input type="number" id="radius" value="100" step="1" min="0">
+        </div>
+        <div class="field">
+          <label for="bifaciality">Bifaciality</label>
+          <input type="number" id="bifaciality" placeholder="0.0 – 1.0" step="any" min="0" max="1">
+        </div>
+        <div class="field">
+          <label for="albedo">Albedo</label>
+          <input type="number" id="albedo" placeholder="0.0 – 1.0" step="any" min="0" max="1">
+        </div>
+        <div class="field full-width">
+          <label for="soiling">Soiling (12 monthly values, pipe-separated)</label>
+          <input type="text" id="soiling" placeholder="e.g. 0|0|0|0|0|0|0|0|0|0|0|0">
+        </div>
+        <div class="field">
+          <label for="timeframe">Timeframe</label>
+          <select id="timeframe">
+            <option value="monthly" selected>Monthly</option>
+            <option value="hourly">Hourly</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="use_wf_albedo">Use Weather File Albedo</label>
+          <select id="use_wf_albedo">
+            <option value="">Default</option>
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+      </div>
+    </details>
+
+    <button class="btn btn-primary" onclick="submitPVWatts()">Run PVWatts</button>
+  </section>
+
+  <!-- Solar Resource Form -->
+  <section id="solar-resource" class="panel">
+    <p class="helper-text">Returns average DNI, GHI, and Tilt at Latitude for the selected location. Only lat/lon required.</p>
+    <button class="btn btn-primary" onclick="submitSolarResource()">Fetch Solar Resource</button>
+  </section>
+
+  <!-- Dataset Query Form -->
+  <section id="dataset-query" class="panel">
+    <p class="helper-text">Returns available weather station datasets near the selected location.</p>
+    <div class="form-grid">
+      <div class="field">
+        <label for="dq_radius">Search Radius (mi)</label>
+        <input type="number" id="dq_radius" value="0" step="1" min="0">
+      </div>
+      <div class="field checkbox-field">
+        <label><input type="checkbox" id="dq_all"> Return all datasets</label>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="submitDatasetQuery()">Fetch Datasets</button>
+  </section>
+
+  <!-- Results / Status Area -->
+  <section id="results" class="results-area">
+    <div id="spinner" class="spinner" style="display:none;">
+      <div class="spinner-dot"></div>
+      <span>Querying NREL API…</span>
+    </div>
+    <div id="status" class="status"></div>
+    <div id="resultCards"></div>
+  </section>
+
+  <?!= include('Script') ?>
+</body>
+</html>

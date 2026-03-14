@@ -1,0 +1,443 @@
+<!-- Charts Tab: Chart.js visualizations with inject buttons -->
+
+<div id="charts-placeholder" class="placeholder">
+  <p><strong>No data yet</strong></p>
+  <p>Fetch solar data from the Location tab first.</p>
+</div>
+
+<div id="charts-content" style="display: none">
+  <!-- 1. Energy per Panel (scatter) -->
+  <div class="chart-section">
+    <p class="chart-desc">Panel # vs. Energy per panel [kWh/yr]</p>
+    <div class="stats-box" id="panel-energy-stats"></div>
+    <div class="chart-container">
+      <canvas id="chart-energy-panel"></canvas>
+    </div>
+    <button class="btn-inject" onclick="injectChartPanelEnergy(this)">
+      <span class="inject-icon">&#8677;</span> Inject to Sheet
+    </button>
+  </div>
+
+  <!-- 2. Energy per Configuration (line) -->
+  <div class="chart-section">
+    <p class="chart-desc">Number of panels vs. Total energy [kWh/yr]</p>
+    <div class="chart-container">
+      <canvas id="chart-energy-config"></canvas>
+    </div>
+    <button class="btn-inject" onclick="injectChartConfigs(this)">
+      <span class="inject-icon">&#8677;</span> Inject to Sheet
+    </button>
+  </div>
+
+  <!-- 3. Energy Projection (bar) -->
+  <div class="chart-section">
+    <p class="chart-desc">Year vs. Projected energy [kWh/yr]</p>
+    <div class="chart-container">
+      <canvas id="chart-depreciation"></canvas>
+    </div>
+    <button class="btn-inject" onclick="injectChartProjection(this)">
+      <span class="inject-icon">&#8677;</span> Inject to Sheet
+    </button>
+  </div>
+
+  <!-- 4. Panels by Roof Segment (bar) -->
+  <div class="chart-section">
+    <p class="chart-desc">Roof segment vs. Panel count</p>
+    <div class="chart-container">
+      <canvas id="chart-segment-dist"></canvas>
+    </div>
+    <button class="btn-inject" onclick="injectChartSegments(this)">
+      <span class="inject-icon">&#8677;</span> Inject to Sheet
+    </button>
+  </div>
+
+  <!-- 5. Sunniness over Roof Area (line) -->
+  <div class="chart-section">
+    <p class="chart-desc">Roof area percentile [%] vs. Sunshine [kWh/kW/yr]</p>
+    <div class="chart-container">
+      <canvas id="chart-sunniness"></canvas>
+    </div>
+    <button class="btn-inject" onclick="injectChartSunniness(this)">
+      <span class="inject-icon">&#8677;</span> Inject to Sheet
+    </button>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // Chart instances
+  // ============================================================
+  var chartInstances = {};
+
+  function destroyChart(id) {
+    if (chartInstances[id]) {
+      chartInstances[id].destroy();
+      delete chartInstances[id];
+    }
+  }
+
+  // Common chart options
+  var commonChartOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      title: { display: false },
+    },
+    layout: { padding: { top: 2, right: 4, bottom: 2, left: 2 } },
+  };
+
+  function makeTicks() {
+    return {
+      font: { size: 9 },
+      callback: sciTickCallback,
+      maxTicksLimit: 8,
+    };
+  }
+
+  function renderAllCharts() {
+    if (!APP.buildingInsights) return;
+
+    document.getElementById("charts-placeholder").style.display = "none";
+    document.getElementById("charts-content").style.display = "block";
+
+    renderEnergyPerPanel();
+    renderEnergyPerConfig();
+    renderDepreciation();
+    renderSegmentDistribution();
+    renderSunniness();
+  }
+
+  // ============================================================
+  // 1. Energy per Panel (scatter)
+  // ============================================================
+  function renderEnergyPerPanel() {
+    var sp = APP.buildingInsights.solarPotential || {};
+    var panels = sp.solarPanels || [];
+    var ratio = getCapacityRatio();
+    var count = Math.min(APP.panelCount, panels.length);
+
+    var energies = [];
+    var labels = [];
+    for (var i = 0; i < count; i++) {
+      var e = (panels[i].yearlyEnergyDcKwh || 0) * ratio;
+      energies.push(e);
+      labels.push(i + 1);
+    }
+
+    // Stats
+    if (energies.length > 0) {
+      var sorted = energies.slice().sort(function (a, b) {
+        return a - b;
+      });
+      var sum = energies.reduce(function (a, b) {
+        return a + b;
+      }, 0);
+      var mean = sum / energies.length;
+      var median =
+        energies.length % 2 === 0
+          ? (sorted[energies.length / 2 - 1] + sorted[energies.length / 2]) / 2
+          : sorted[Math.floor(energies.length / 2)];
+      var variance =
+        energies.reduce(function (a, b) {
+          return a + Math.pow(b - mean, 2);
+        }, 0) / energies.length;
+      var std = Math.sqrt(variance);
+
+      document.getElementById("panel-energy-stats").innerHTML =
+        '<div class="stats-row"><span class="stats-label">Min</span><span class="stats-value">' +
+        sorted[0].toFixed(1) +
+        " kWh</span></div>" +
+        '<div class="stats-row"><span class="stats-label">Max</span><span class="stats-value">' +
+        sorted[sorted.length - 1].toFixed(1) +
+        " kWh</span></div>" +
+        '<div class="stats-row"><span class="stats-label">Mean</span><span class="stats-value">' +
+        mean.toFixed(1) +
+        " kWh</span></div>" +
+        '<div class="stats-row"><span class="stats-label">Median</span><span class="stats-value">' +
+        median.toFixed(1) +
+        " kWh</span></div>" +
+        '<div class="stats-row"><span class="stats-label">Std Dev</span><span class="stats-value">' +
+        std.toFixed(1) +
+        " kWh</span></div>";
+    }
+
+    destroyChart("chart-energy-panel");
+    var ctx = document.getElementById("chart-energy-panel").getContext("2d");
+    chartInstances["chart-energy-panel"] = new Chart(ctx, {
+      type: "scatter",
+      data: {
+        datasets: [
+          {
+            data: labels.map(function (l, i) {
+              return { x: l, y: energies[i] };
+            }),
+            backgroundColor: "rgba(26, 115, 232, 0.5)",
+            pointRadius: count > 500 ? 1 : 2,
+          },
+        ],
+      },
+      options: Object.assign({}, commonChartOpts, {
+        scales: {
+          x: { ticks: makeTicks(), title: { display: false } },
+          y: { ticks: makeTicks(), title: { display: false } },
+        },
+      }),
+    });
+  }
+
+  // ============================================================
+  // 2. Energy per Configuration (line)
+  // ============================================================
+  function renderEnergyPerConfig() {
+    var sp = APP.buildingInsights.solarPotential || {};
+    var configs = sp.solarPanelConfigs || [];
+    var ratio = getCapacityRatio();
+
+    var panelCounts = [];
+    var energies = [];
+    configs.forEach(function (cfg) {
+      panelCounts.push(cfg.panelsCount || 0);
+      energies.push((cfg.yearlyEnergyDcKwh || 0) * ratio);
+    });
+
+    destroyChart("chart-energy-config");
+    var ctx = document.getElementById("chart-energy-config").getContext("2d");
+    chartInstances["chart-energy-config"] = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: panelCounts,
+        datasets: [
+          {
+            data: energies,
+            borderColor: "#1a73e8",
+            backgroundColor: "rgba(26, 115, 232, 0.1)",
+            fill: true,
+            pointRadius: 0,
+            borderWidth: 2,
+          },
+        ],
+      },
+      options: Object.assign({}, commonChartOpts, {
+        scales: {
+          x: {
+            ticks: Object.assign({}, makeTicks(), { maxTicksLimit: 10 }),
+            title: { display: false },
+          },
+          y: { ticks: makeTicks(), title: { display: false } },
+        },
+      }),
+    });
+  }
+
+  // ============================================================
+  // 3. Energy Projection (bar)
+  // ============================================================
+  function renderDepreciation() {
+    var sp = APP.buildingInsights.solarPotential || {};
+    var configs = sp.solarPanelConfigs || [];
+    var ratio = getCapacityRatio();
+    var degradation = APP.degradationRate;
+
+    var baseEnergy = 0;
+    for (var i = 0; i < configs.length; i++) {
+      if (configs[i].panelsCount >= APP.panelCount) {
+        baseEnergy = (configs[i].yearlyEnergyDcKwh || 0) * ratio;
+        break;
+      }
+    }
+    if (baseEnergy === 0 && configs.length > 0) {
+      baseEnergy = (configs[configs.length - 1].yearlyEnergyDcKwh || 0) * ratio;
+    }
+
+    var lifetime = sp.panelLifetimeYears || 20;
+    var years = [];
+    var energies = [];
+    for (var y = 1; y <= lifetime; y++) {
+      years.push(y);
+      energies.push(baseEnergy * Math.pow(1 - degradation, y));
+    }
+
+    destroyChart("chart-depreciation");
+    var ctx = document.getElementById("chart-depreciation").getContext("2d");
+    chartInstances["chart-depreciation"] = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: years,
+        datasets: [
+          {
+            data: energies,
+            backgroundColor: "rgba(26, 115, 232, 0.6)",
+            borderRadius: 2,
+          },
+        ],
+      },
+      options: Object.assign({}, commonChartOpts, {
+        scales: {
+          x: {
+            ticks: { font: { size: 9 }, maxTicksLimit: 10 },
+            title: { display: false },
+          },
+          y: {
+            ticks: makeTicks(),
+            title: { display: false },
+            min: energies.length > 0 ? energies[energies.length - 1] * 0.9 : 0,
+          },
+        },
+      }),
+    });
+  }
+
+  // ============================================================
+  // 4. Panel Distribution by Segment (bar)
+  // ============================================================
+  function renderSegmentDistribution() {
+    var sp = APP.buildingInsights.solarPotential || {};
+    var panels = sp.solarPanels || [];
+    var count = Math.min(APP.panelCount, panels.length);
+
+    var segCounts = {};
+    for (var i = 0; i < count; i++) {
+      var seg = panels[i].segmentIndex || 0;
+      segCounts[seg] = (segCounts[seg] || 0) + 1;
+    }
+
+    var segments = Object.keys(segCounts).sort(function (a, b) {
+      return a - b;
+    });
+    var counts = segments.map(function (s) {
+      return segCounts[s];
+    });
+
+    destroyChart("chart-segment-dist");
+    var ctx = document.getElementById("chart-segment-dist").getContext("2d");
+    chartInstances["chart-segment-dist"] = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: segments,
+        datasets: [
+          {
+            data: counts,
+            backgroundColor: "rgba(26, 115, 232, 0.6)",
+            borderRadius: 2,
+          },
+        ],
+      },
+      options: Object.assign({}, commonChartOpts, {
+        scales: {
+          x: { ticks: { font: { size: 9 } }, title: { display: false } },
+          y: {
+            ticks: makeTicks(),
+            title: { display: false },
+            beginAtZero: true,
+          },
+        },
+      }),
+    });
+  }
+
+  // ============================================================
+  // 5. Sunniness over Roof Area (line)
+  // ============================================================
+  function renderSunniness() {
+    var sp = APP.buildingInsights.solarPotential || {};
+    var wrs = sp.wholeRoofStats || {};
+    var quantiles = wrs.sunshineQuantiles || [];
+
+    if (quantiles.length === 0) {
+      document.getElementById("chart-sunniness").parentElement.style.display =
+        "none";
+      return;
+    }
+    document.getElementById("chart-sunniness").parentElement.style.display = "";
+
+    var pcts = [];
+    var values = [];
+    for (var i = 0; i < quantiles.length; i++) {
+      pcts.push(Math.round((i / (quantiles.length - 1)) * 100));
+      values.push(quantiles[i]);
+    }
+
+    destroyChart("chart-sunniness");
+    var ctx = document.getElementById("chart-sunniness").getContext("2d");
+    chartInstances["chart-sunniness"] = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: pcts,
+        datasets: [
+          {
+            data: values,
+            borderColor: "#f9ab00",
+            backgroundColor: "rgba(249, 171, 0, 0.15)",
+            fill: true,
+            pointRadius: 3,
+            borderWidth: 2,
+          },
+        ],
+      },
+      options: Object.assign({}, commonChartOpts, {
+        scales: {
+          x: { ticks: { font: { size: 9 } }, title: { display: false } },
+          y: { ticks: makeTicks(), title: { display: false } },
+        },
+      }),
+    });
+  }
+
+  // ============================================================
+  // Inject chart data to Sheets
+  // ============================================================
+  function injectChartPanelEnergy(btn) {
+    if (!APP.buildingInsights) return;
+    injectToSheet(btn, "writeIndividualPanels", [
+      APP.buildingInsights,
+      APP.panelCapacityWatts,
+      APP.lat,
+      APP.lng,
+    ]);
+  }
+
+  function injectChartConfigs(btn) {
+    if (!APP.buildingInsights) return;
+    injectToSheet(btn, "writePanelConfigs", [
+      APP.buildingInsights,
+      APP.panelCapacityWatts,
+    ]);
+  }
+
+  function injectChartProjection(btn) {
+    if (!APP.buildingInsights) return;
+    injectToSheet(btn, "writeEnergyProjection", [
+      APP.buildingInsights,
+      APP.panelCount,
+      APP.panelCapacityWatts,
+      APP.degradationRate,
+    ]);
+  }
+
+  function injectChartSegments(btn) {
+    if (!APP.buildingInsights) return;
+    var sp = APP.buildingInsights.solarPotential || {};
+    var panels = sp.solarPanels || [];
+    var count = Math.min(APP.panelCount, panels.length);
+    var segCounts = {};
+    for (var i = 0; i < count; i++) {
+      var seg = panels[i].segmentIndex || 0;
+      segCounts[seg] = (segCounts[seg] || 0) + 1;
+    }
+    var data = [["Roof Segment", "Panel Count"]];
+    Object.keys(segCounts)
+      .sort(function (a, b) {
+        return a - b;
+      })
+      .forEach(function (s) {
+        data.push([parseInt(s), segCounts[s]]);
+      });
+    injectToSheet(btn, "writeCustomData", ["Segment Panel Counts", data]);
+  }
+
+  function injectChartSunniness(btn) {
+    if (!APP.buildingInsights) return;
+    injectToSheet(btn, "writeSunshineQuantiles", [APP.buildingInsights]);
+  }
+</script>
