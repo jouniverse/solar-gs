@@ -157,4 +157,6 @@ src/
 
 ## License
 
+**MIT License.**
+
 This project is not currently licensed for redistribution.
