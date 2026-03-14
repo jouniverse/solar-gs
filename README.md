@@ -36,7 +36,7 @@ Queries three NREL API endpoints: **PVWatts V8** for grid-connected PV energy pr
 
 ## pvgis-gs — PVGIS Data
 
-Fetches solar irradiation and PV performance data from the European Commission's PVGIS service. Covers 8 calculation tools across dedicated tabs: grid-connected PV, tracking PV, off-grid PV with battery, monthly/daily/hourly radiation time-series, typical meteorological year (TMY), and horizon profile. No API key is required. Location is selected via an OpenStreetMap-powered Leaflet map with optional custom horizon profiles.
+Fetches solar irradiation and PV performance data from the European Commission's **PVGIS** service. Covers 8 calculation tools across dedicated tabs: grid-connected PV, tracking PV, off-grid PV with battery, monthly/daily/hourly radiation time-series, typical meteorological year (TMY), and horizon profile. No API key is required. Location is selected via an OpenStreetMap-powered Leaflet map with optional custom horizon profiles.
 
 **Key features:** 8 data tabs covering all PVGIS calculators · configurable radiation database, PV technology, mounting, and loss parameters · optional LCOE calculation · radiation component breakdown (beam, diffuse, reflected) · automatic sheet creation per fetch · no API key needed
 
