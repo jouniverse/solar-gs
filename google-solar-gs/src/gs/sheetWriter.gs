@@ -105,9 +105,19 @@ function writePanelConfigs(buildingInsights, customCapacityWatts) {
  * @param {Object} buildingInsights
  * @return {Object} {success, message}
  */
-function writeRoofSegments(buildingInsights, lat, lng) {
+function writeRoofSegments(
+  buildingInsights,
+  lat,
+  lng,
+  panelCount,
+  customCapacityWatts,
+) {
   try {
-    var data = processRoofSegments(buildingInsights);
+    var data = processRoofSegments(
+      buildingInsights,
+      panelCount,
+      customCapacityWatts,
+    );
     appendLocationInfo_(data, lat, lng);
     writeDataToSheet_("Roof Segments", data);
     return {

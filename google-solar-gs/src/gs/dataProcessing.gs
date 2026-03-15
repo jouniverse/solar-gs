@@ -124,45 +124,72 @@ function processPanelConfigs(buildingInsights, customCapacityWatts) {
  * @param {Object} buildingInsights
  * @return {Array[]} 2D array with headers
  */
-function processRoofSegments(buildingInsights) {
+function processRoofSegments(
+  buildingInsights,
+  panelCount,
+  customCapacityWatts,
+) {
   var sp = buildingInsights.solarPotential;
+  var headers = [
+    "Segment #",
+    "Pitch (°)",
+    "Azimuth (°)",
+    "Area (m²)",
+    "Height (m)",
+    "Center Lat",
+    "Center Lng",
+    "Panels",
+    "Total Energy (kWh/yr)",
+    "Median Sunshine (kWh/m²/yr)",
+    "Composite Score",
+  ];
   if (!sp || !sp.roofSegmentStats) {
-    return [
-      [
-        "Segment #",
-        "Pitch (°)",
-        "Azimuth (°)",
-        "Area (m²)",
-        "Height (m)",
-        "Center Lat",
-        "Center Lng",
-      ],
-    ];
+    return [headers];
   }
 
   var segments = sp.roofSegmentStats;
-  var data = [
-    [
-      "Segment #",
-      "Pitch (°)",
-      "Azimuth (°)",
-      "Area (m²)",
-      "Height (m)",
-      "Center Lat",
-      "Center Lng",
-    ],
-  ];
+  var panels = sp.solarPanels || [];
+  var defaultCapacity = sp.panelCapacityWatts || 250;
+  var capacityRatio = customCapacityWatts
+    ? customCapacityWatts / defaultCapacity
+    : 1;
+  var count =
+    panelCount != null ? Math.min(panelCount, panels.length) : panels.length;
+
+  // Compute per-segment panel count and energy
+  var segEnergy = {};
+  var segPanelCount = {};
+  for (var k = 0; k < count; k++) {
+    var idx = panels[k].segmentIndex || 0;
+    segEnergy[idx] =
+      (segEnergy[idx] || 0) +
+      (panels[k].yearlyEnergyDcKwh || 0) * capacityRatio;
+    segPanelCount[idx] = (segPanelCount[idx] || 0) + 1;
+  }
+
+  var data = [headers];
 
   for (var i = 0; i < segments.length; i++) {
     var seg = segments[i];
+    var area = seg.stats ? seg.stats.areaMeters2 : 0;
+    var q =
+      seg.stats && seg.stats.sunshineQuantiles
+        ? seg.stats.sunshineQuantiles
+        : [];
+    var medianSun = q.length >= 6 ? q[5] : 0;
+    var score = Math.round(medianSun * area * 100) / 100;
     data.push([
       i,
       Math.round((seg.pitchDegrees || 0) * 100) / 100,
       Math.round((seg.azimuthDegrees || 0) * 100) / 100,
-      Math.round((seg.stats ? seg.stats.areaMeters2 : 0) * 100) / 100,
+      Math.round(area * 100) / 100,
       Math.round((seg.planeHeightAtCenterMeters || 0) * 100) / 100,
       seg.center ? seg.center.latitude : "",
       seg.center ? seg.center.longitude : "",
+      segPanelCount[i] || 0,
+      Math.round((segEnergy[i] || 0) * 100) / 100,
+      Math.round(medianSun * 100) / 100,
+      score,
     ]);
   }
 

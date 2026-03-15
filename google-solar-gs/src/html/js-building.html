@@ -82,15 +82,6 @@
     </p>
   </div>
 
-  <!-- Roof Segments Table -->
-  <div class="section">
-    <h3>Roof Segments</h3>
-    <div class="table-container" id="roof-segments-table"></div>
-    <button class="btn-inject" onclick="injectRoofSegments(this)">
-      <span class="inject-icon">&#8677;</span> Inject to Sheet
-    </button>
-  </div>
-
   <!-- Individual Panels Table -->
   <div class="section">
     <h3>
@@ -108,6 +99,46 @@
     <button class="btn-inject" onclick="injectPanels(this)">
       <span class="inject-icon">&#8677;</span> Inject to Sheet
     </button>
+  </div>
+
+  <!-- Roof Segments Table -->
+  <div class="section">
+    <h3>Roof Segments</h3>
+    <div class="table-container" id="roof-segments-table"></div>
+    <button class="btn-inject" onclick="injectRoofSegments(this)">
+      <span class="inject-icon">&#8677;</span> Inject to Sheet
+    </button>
+  </div>
+
+  <!-- Segment Explorer -->
+  <div class="section" id="segment-explorer-section" style="display: none">
+    <h3>Segment Explorer</h3>
+    <div class="form-row">
+      <label for="segment-select">Select Roof Segment</label>
+      <select id="segment-select">
+        <option value="">— Choose a segment —</option>
+      </select>
+    </div>
+    <div id="segment-detail" style="display: none">
+      <div class="panel-map-container">
+        <div id="segment-panels-map" style="height: 220px"></div>
+      </div>
+      <div class="panels-legend">
+        <span>Low energy</span>
+        <div class="panels-legend-gradient"></div>
+        <span>High energy</span>
+      </div>
+      <div class="chart-section">
+        <p class="chart-desc">
+          Sunshine quantiles for this segment (kWh/m²/yr). The 11 values
+          represent the distribution from minimum (0th percentile) to maximum
+          (100th percentile).
+        </p>
+        <div class="chart-container">
+          <canvas id="segment-quantiles-chart"></canvas>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -136,10 +167,12 @@
 
     renderSummaryCards(bi);
     renderSolarPotential(sp);
-    renderRoofSegments(sp.roofSegmentStats || []);
+    renderRoofSegments(sp);
     renderPanelsTable(sp);
     updateConfigEnergy();
     renderPanelsOnMap(sp);
+    populateSegmentDropdown(sp.roofSegmentStats || []);
+    clearSegmentExplorer();
   }
 
   function renderSummaryCards(bi) {
@@ -209,15 +242,40 @@
     document.getElementById("solar-potential-stats").innerHTML = html;
   }
 
-  function renderRoofSegments(segments) {
+  function renderRoofSegments(sp) {
+    var segments = sp.roofSegmentStats || [];
     if (!segments || segments.length === 0) {
       document.getElementById("roof-segments-table").innerHTML =
         '<p class="placeholder">No roof segment data</p>';
       return;
     }
+
+    // Compute per-segment total energy from active panels
+    var panels = sp.solarPanels || [];
+    var ratio = getCapacityRatio();
+    var count = Math.min(APP.panelCount, panels.length);
+    var segEnergy = {};
+    var segPanelCount = {};
+    for (var k = 0; k < count; k++) {
+      var idx = panels[k].segmentIndex || 0;
+      segEnergy[idx] =
+        (segEnergy[idx] || 0) + (panels[k].yearlyEnergyDcKwh || 0) * ratio;
+      segPanelCount[idx] = (segPanelCount[idx] || 0) + 1;
+    }
+
     var html =
-      "<table><thead><tr><th>#</th><th>Pitch (\u00B0)</th><th>Azimuth (\u00B0)</th><th>Area (m\u00B2)</th><th>Height (m)</th></tr></thead><tbody>";
+      "<table><thead><tr><th>#</th><th>Pitch (\u00B0)</th><th>Azimuth (\u00B0)</th><th>Area (m\u00B2)</th><th>Height (m)</th><th>Panels</th><th>Energy</th><th>Median Sun</th><th>Score</th></tr></thead><tbody>";
     segments.forEach(function (seg, i) {
+      var q =
+        seg.stats && seg.stats.sunshineQuantiles
+          ? seg.stats.sunshineQuantiles
+          : [];
+      var medianSun = q.length >= 6 ? q[5] : 0; // index 5 = 50th percentile (median)
+      var area = seg.stats ? seg.stats.areaMeters2 : 0;
+      var score = medianSun * area;
+      var totalEnergy = segEnergy[i] || 0;
+      var panelCnt = segPanelCount[i] || 0;
+
       html +=
         "<tr>" +
         "<td>" +
@@ -230,10 +288,22 @@
         (seg.azimuthDegrees || 0).toFixed(2) +
         "</td>" +
         "<td>" +
-        (seg.stats ? seg.stats.areaMeters2.toFixed(1) : "-") +
+        (area ? area.toFixed(1) : "-") +
         "</td>" +
         "<td>" +
         (seg.planeHeightAtCenterMeters || 0).toFixed(1) +
+        "</td>" +
+        "<td>" +
+        panelCnt +
+        "</td>" +
+        "<td>" +
+        totalEnergy.toFixed(1) +
+        "</td>" +
+        "<td>" +
+        medianSun.toFixed(1) +
+        "</td>" +
+        "<td>" +
+        score.toFixed(0) +
         "</td>" +
         "</tr>";
     });
@@ -293,6 +363,229 @@
     }
     html += "</tbody></table>";
     document.getElementById("panels-table").innerHTML = html;
+  }
+
+  // ============================================================
+  // Segment Explorer
+  // ============================================================
+  var segmentMap = null;
+  var segmentMarkers = [];
+  var segmentQuantilesChart = null;
+
+  function clearSegmentExplorer() {
+    // Reset dropdown to default
+    document.getElementById("segment-select").value = "";
+    // Hide detail section
+    document.getElementById("segment-detail").style.display = "none";
+    // Clear segment map markers
+    if (segmentMap) {
+      segmentMarkers.forEach(function (m) {
+        segmentMap.removeLayer(m);
+      });
+      segmentMarkers = [];
+    }
+    // Destroy quantiles chart
+    if (segmentQuantilesChart) {
+      segmentQuantilesChart.destroy();
+      segmentQuantilesChart = null;
+    }
+  }
+
+  function populateSegmentDropdown(segments) {
+    var sel = document.getElementById("segment-select");
+    // Reset options
+    sel.innerHTML = '<option value="">— Choose a segment —</option>';
+    if (!segments || segments.length === 0) {
+      document.getElementById("segment-explorer-section").style.display =
+        "none";
+      return;
+    }
+    segments.forEach(function (seg, i) {
+      var opt = document.createElement("option");
+      opt.value = i;
+      var area = seg.stats ? seg.stats.areaMeters2.toFixed(0) : "?";
+      opt.textContent =
+        "Segment " +
+        i +
+        " — " +
+        area +
+        " m\u00B2, pitch " +
+        (seg.pitchDegrees || 0).toFixed(1) +
+        "\u00B0";
+      sel.appendChild(opt);
+    });
+    document.getElementById("segment-explorer-section").style.display = "";
+  }
+
+  function onSegmentSelect(segIdx) {
+    var detail = document.getElementById("segment-detail");
+    if (segIdx === "" || segIdx === null || segIdx === undefined) {
+      detail.style.display = "none";
+      return;
+    }
+    segIdx = parseInt(segIdx);
+    detail.style.display = "";
+    renderSegmentPanelsMap(segIdx);
+    renderSegmentQuantilesChart(segIdx);
+  }
+
+  function initSegmentMap() {
+    if (segmentMap) {
+      segmentMap.invalidateSize();
+      return;
+    }
+    var center = [APP.lat || 51.5124, APP.lng || -0.0913];
+    segmentMap = L.map("segment-panels-map", {
+      center: center,
+      zoom: 19,
+      zoomControl: true,
+    });
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Esri", maxZoom: 22 },
+    ).addTo(segmentMap);
+  }
+
+  function renderSegmentPanelsMap(segIdx) {
+    initSegmentMap();
+    // Clear existing markers
+    segmentMarkers.forEach(function (m) {
+      segmentMap.removeLayer(m);
+    });
+    segmentMarkers = [];
+
+    var sp = APP.buildingInsights
+      ? APP.buildingInsights.solarPotential || {}
+      : {};
+    var panels = sp.solarPanels || [];
+    var ratio = getCapacityRatio();
+    var count = Math.min(APP.panelCount, panels.length);
+
+    // Collect panels for this segment
+    var segPanels = [];
+    for (var i = 0; i < count; i++) {
+      if ((panels[i].segmentIndex || 0) === segIdx) {
+        segPanels.push(panels[i]);
+      }
+    }
+
+    if (segPanels.length === 0) {
+      segmentMap.setView([APP.lat || 51.5124, APP.lng || -0.0913], 19);
+      return;
+    }
+
+    // Compute min/max energy for color scaling
+    var minE = Infinity,
+      maxE = -Infinity;
+    segPanels.forEach(function (p) {
+      var e = (p.yearlyEnergyDcKwh || 0) * ratio;
+      if (e < minE) minE = e;
+      if (e > maxE) maxE = e;
+    });
+    var rangeE = maxE - minE || 1;
+
+    var radius = segPanels.length > 200 ? 3 : segPanels.length > 50 ? 4 : 5;
+    var bounds = [];
+
+    segPanels.forEach(function (p, j) {
+      if (!p.center) return;
+      var lat = p.center.latitude;
+      var lng = p.center.longitude;
+      var energy = (p.yearlyEnergyDcKwh || 0) * ratio;
+      var norm = (energy - minE) / rangeE;
+      var r = Math.round(norm * 255);
+      var b = Math.round((1 - norm) * 255);
+      var color = "rgb(" + r + ",50," + b + ")";
+
+      var marker = L.circleMarker([lat, lng], {
+        radius: radius,
+        fillColor: color,
+        fillOpacity: 0.85,
+        color: "#fff",
+        weight: 0.5,
+      })
+        .bindTooltip(energy.toFixed(1) + " kWh/yr", { direction: "top" })
+        .addTo(segmentMap);
+
+      segmentMarkers.push(marker);
+      bounds.push([lat, lng]);
+    });
+
+    if (bounds.length > 0) {
+      segmentMap.fitBounds(bounds, { padding: [20, 20], maxZoom: 20 });
+    }
+  }
+
+  function renderSegmentQuantilesChart(segIdx) {
+    var sp = APP.buildingInsights
+      ? APP.buildingInsights.solarPotential || {}
+      : {};
+    var segments = sp.roofSegmentStats || [];
+    var seg = segments[segIdx];
+    if (!seg || !seg.stats || !seg.stats.sunshineQuantiles) return;
+
+    var q = seg.stats.sunshineQuantiles;
+    var labels = [
+      "0%",
+      "10%",
+      "20%",
+      "30%",
+      "40%",
+      "50%",
+      "60%",
+      "70%",
+      "80%",
+      "90%",
+      "100%",
+    ];
+
+    var ctx = document
+      .getElementById("segment-quantiles-chart")
+      .getContext("2d");
+    if (segmentQuantilesChart) segmentQuantilesChart.destroy();
+
+    segmentQuantilesChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: labels.slice(0, q.length),
+        datasets: [
+          {
+            label: "Sunshine (kWh/m\u00B2/yr)",
+            data: q,
+            backgroundColor: q.map(function (v, i) {
+              var norm = q.length > 1 ? i / (q.length - 1) : 0;
+              var r = Math.round(255 * norm);
+              var b = Math.round(255 * (1 - norm));
+              return "rgba(" + r + ",50," + b + ",0.7)";
+            }),
+            borderColor: "rgba(26,115,232,0.8)",
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            title: {
+              display: true,
+              text: "kWh/m\u00B2/yr",
+              font: { size: 10 },
+            },
+            ticks: { font: { size: 10 } },
+          },
+          x: {
+            title: { display: true, text: "Percentile", font: { size: 10 } },
+            ticks: { font: { size: 10 } },
+          },
+        },
+      },
+    });
   }
 
   // ============================================================
@@ -401,6 +694,9 @@
           var sp = APP.buildingInsights.solarPotential || {};
           renderPanelsTable(sp);
           renderPanelsOnMap(sp);
+          renderRoofSegments(sp);
+          var selVal = document.getElementById("segment-select").value;
+          if (selVal !== "") renderSegmentPanelsMap(parseInt(selVal));
         }
         if (typeof renderAllCharts === "function") renderAllCharts();
       });
@@ -419,6 +715,9 @@
           var sp = APP.buildingInsights.solarPotential || {};
           renderPanelsTable(sp);
           renderPanelsOnMap(sp);
+          renderRoofSegments(sp);
+          var selVal = document.getElementById("segment-select").value;
+          if (selVal !== "") renderSegmentPanelsMap(parseInt(selVal));
         }
         if (typeof renderAllCharts === "function") renderAllCharts();
       });
@@ -428,6 +727,12 @@
       .addEventListener("change", function () {
         APP.degradationRate = parseFloat(this.value) / 100 || 0.005;
         if (typeof renderAllCharts === "function") renderAllCharts();
+      });
+
+    document
+      .getElementById("segment-select")
+      .addEventListener("change", function () {
+        onSegmentSelect(this.value);
       });
   });
 
@@ -467,6 +772,8 @@
       APP.buildingInsights,
       APP.lat,
       APP.lng,
+      APP.panelCount,
+      APP.panelCapacityWatts,
     ]);
   }
 
