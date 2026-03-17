@@ -171,7 +171,7 @@
     renderPanelsTable(sp);
     updateConfigEnergy();
     renderPanelsOnMap(sp);
-    populateSegmentDropdown(sp.roofSegmentStats || []);
+    populateSegmentDropdown(sp);
     clearSegmentExplorer();
   }
 
@@ -391,7 +391,8 @@
     }
   }
 
-  function populateSegmentDropdown(segments) {
+  function populateSegmentDropdown(sp) {
+    var segments = sp.roofSegmentStats || [];
     var sel = document.getElementById("segment-select");
     // Reset options
     sel.innerHTML = '<option value="">— Choose a segment —</option>';
@@ -400,18 +401,23 @@
         "none";
       return;
     }
+
+    // Count panels per segment
+    var panels = sp.solarPanels || [];
+    var count = Math.min(APP.panelCount, panels.length);
+    var segPanelCount = {};
+    for (var k = 0; k < count; k++) {
+      var idx = panels[k].segmentIndex || 0;
+      segPanelCount[idx] = (segPanelCount[idx] || 0) + 1;
+    }
+
     segments.forEach(function (seg, i) {
       var opt = document.createElement("option");
       opt.value = i;
       var area = seg.stats ? seg.stats.areaMeters2.toFixed(0) : "?";
+      var pc = segPanelCount[i] || 0;
       opt.textContent =
-        "Segment " +
-        i +
-        " — " +
-        area +
-        " m\u00B2, pitch " +
-        (seg.pitchDegrees || 0).toFixed(1) +
-        "\u00B0";
+        "Segment " + i + " \u2014 " + area + " m\u00B2, # " + pc;
       sel.appendChild(opt);
     });
     document.getElementById("segment-explorer-section").style.display = "";
@@ -461,11 +467,11 @@
     var ratio = getCapacityRatio();
     var count = Math.min(APP.panelCount, panels.length);
 
-    // Collect panels for this segment
+    // Collect panels for this segment (keep original index)
     var segPanels = [];
     for (var i = 0; i < count; i++) {
       if ((panels[i].segmentIndex || 0) === segIdx) {
-        segPanels.push(panels[i]);
+        segPanels.push({ panel: panels[i], idx: i });
       }
     }
 
@@ -477,8 +483,8 @@
     // Compute min/max energy for color scaling
     var minE = Infinity,
       maxE = -Infinity;
-    segPanels.forEach(function (p) {
-      var e = (p.yearlyEnergyDcKwh || 0) * ratio;
+    segPanels.forEach(function (item) {
+      var e = (item.panel.yearlyEnergyDcKwh || 0) * ratio;
       if (e < minE) minE = e;
       if (e > maxE) maxE = e;
     });
@@ -487,7 +493,8 @@
     var radius = segPanels.length > 200 ? 3 : segPanels.length > 50 ? 4 : 5;
     var bounds = [];
 
-    segPanels.forEach(function (p, j) {
+    segPanels.forEach(function (item) {
+      var p = item.panel;
       if (!p.center) return;
       var lat = p.center.latitude;
       var lng = p.center.longitude;
@@ -504,7 +511,10 @@
         color: "#fff",
         weight: 0.5,
       })
-        .bindTooltip(energy.toFixed(1) + " kWh/yr", { direction: "top" })
+        .bindTooltip(
+          "#" + (item.idx + 1) + ": " + energy.toFixed(1) + " kWh/yr",
+          { direction: "top" },
+        )
         .addTo(segmentMap);
 
       segmentMarkers.push(marker);
@@ -695,6 +705,7 @@
           renderPanelsTable(sp);
           renderPanelsOnMap(sp);
           renderRoofSegments(sp);
+          populateSegmentDropdown(sp);
           var selVal = document.getElementById("segment-select").value;
           if (selVal !== "") renderSegmentPanelsMap(parseInt(selVal));
         }
@@ -716,6 +727,7 @@
           renderPanelsTable(sp);
           renderPanelsOnMap(sp);
           renderRoofSegments(sp);
+          populateSegmentDropdown(sp);
           var selVal = document.getElementById("segment-select").value;
           if (selVal !== "") renderSegmentPanelsMap(parseInt(selVal));
         }
